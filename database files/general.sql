@@ -38,11 +38,15 @@ END;
 CREATE OR REPLACE TRIGGER trg_control_precios
 BEFORE INSERT ON Historico_Precios
 FOR EACH ROW
+DECLARE
+    v_id_juguete NUMBER;
 BEGIN
+    v_id_juguete := :NEW.id_juguete;
+
     UPDATE Historico_Precios
     SET fecha_fin = SYSDATE
-    WHERE id_juguete = :NEW.id_juguete
+    WHERE id_juguete = v_id_juguete
       AND fecha_fin IS NULL;
-    :NEW.fecha_fin := NULL;
+
 END;
 /

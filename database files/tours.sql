@@ -237,19 +237,27 @@ END;
 -- 6. Trigger validar menores
 -- Especificar en el nombre que son para las entradas
 -- No usar eventos cómo new u old en consultas.
-CREATE OR REPLACE TRIGGER trg_validar_menores
+CREATE OR REPLACE TRIGGER trg_validar_menores_entradas
 BEFORE INSERT ON Entradas
 FOR EACH ROW
 DECLARE
+    v_fecha DATE;
+    v_num   NUMBER;
+    
     v_cantidad_adultos NUMBER;
 BEGIN
+    v_fecha := :NEW.fecha_tour_ins;
+    v_num   := :NEW.numeroinscripcion;
+
     IF :NEW.tipo = 'MENOR' THEN
+        
         SELECT COUNT(*)
         INTO v_cantidad_adultos
         FROM Entradas
-        WHERE fecha_tour_ins = :NEW.fecha_tour_ins
-          AND numeroinscripcion = :NEW.numeroinscripcion
+        WHERE fecha_tour_ins = v_fecha
+          AND numeroinscripcion = v_num
           AND tipo = 'ADULTO';
+          
         IF v_cantidad_adultos = 0 THEN
             RAISE_APPLICATION_ERROR(-20005, 'ERROR: No se puede registrar un MENOR sin haber registrado primero un ADULTO responsable.');
         END IF;

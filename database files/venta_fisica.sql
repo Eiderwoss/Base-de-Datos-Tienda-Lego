@@ -49,31 +49,37 @@ BEGIN
 END buscar_juguete;
 
 -- Capaz deba agregarle el país tmb
-CREATE OR REPLACE FUNCTION buscar_tienda (nombre_tienda IN varchar2(50),nombre_ciudad IN varchar2(30))
+CREATE OR REPLACE FUNCTION buscar_tienda (nombre_tienda IN varchar2(50),nombre_ciudad IN varchar2(30),nombre_pais IN varchar2(30))
 RETURN number(4) IS
     id_tienda number(4);
     id_ciudad number(5);
     id_pais   number(3);
     id_estado number(5);
 BEGIN
-    IF (nombre_tienda IS NOT NULL) AND (nombre_ciudad IS NULL) THEN
+    IF (nombre_tienda IS NOT NULL) AND (nombre_ciudad IS NULL) AND (nombre_pais IS NULL) THEN
         BEGIN
             SELECT t.id INTO id_tienda
             FROM Tienda t
-            WHERE t.nombre = nombre_ciudad
-            RETURN id_tienda
+            WHERE t.nombre = nombre_ciudad;
+
+            RETURN id_tienda;
         EXCEPTION
             WHEN NO_DATA_FOUND THEN NULL;
             WHEN TOO_MANY_ROWS THEN
-                RAISE_APPLICATION_ERROR(-20002, 'Error: Existen muchas tiendas llamadas: '||nombre_tienda||'. Especifique la ciudad por favor');
+                RAISE_APPLICATION_ERROR(-20002, 'Error: Existen muchas tiendas llamadas: '||nombre_tienda||'. Especifique la ciudad y el país por favor');
         END;
     END IF;
 
-    IF (nombre_tienda IS NULL) AND (nombre_ciudad IS NOT NULL) THEN
+    IF (nombre_tienda IS NULL) AND (nombre_ciudad IS NOT NULL) AND (nombre_pais IS NOT NULL) THEN
         BEGIN
-            SELECT c.id_pais_est INTO id_pais, c.id_estado INTO id_estado, c.id INTO id_ciudad
+            SELECT p.id INTO id_pais
+            FROM Pais p
+            WHERE p.nombre = nombre_pais;
+
+            SELECT c.id_estado INTO id_estado, c.id INTO id_ciudad
             FROM Ciudad c
-            WHERE c.nombre = nombre_ciudad;
+            WHERE c.nombre = nombre_ciudad AND
+            c.id_pais_est = id_pais;
 
             SELECT t.id INTO id_tienda
             FROM Tienda t
@@ -90,11 +96,16 @@ BEGIN
         END;
     END IF;
 
-    IF (nombre_tienda IS NOT NULL) AND (nombre_ciudad IS NOT NULL) THEN
+    IF (nombre_tienda IS NOT NULL) AND (nombre_ciudad IS NOT NULL) AND (nombre_pais IS NOT NULL) THEN
         BEGIN
-            SELECT c.id_pais_est INTO id_pais, c.id_estado INTO id_estado, c.id INTO id_ciudad
+            SELECT p.id INTO id_pais
+            FROM Pais p
+            WHERE p.nombre = nombre_pais;
+
+            SELECT c.id_estado INTO id_estado, c.id INTO id_ciudad
             FROM Ciudad c
-            WHERE c.nombre = nombre_ciudad;
+            WHERE c.nombre = nombre_ciudad AND
+            c.id_pais_est = id_pais;
 
             SELECT t.id INTO id_tienda
             FROM Tienda t

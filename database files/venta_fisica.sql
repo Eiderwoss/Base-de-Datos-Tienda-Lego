@@ -15,7 +15,7 @@ BEGIN
         END;
     END IF;
 
-    IF primer_nombre IS NOT NULL AND primer_apellido IS NOT NULL THEN
+    IF (primer_nombre IS NOT NULL) AND (primer_apellido IS NOT NULL) THEN
         BEGIN
             SELECT c.id_lego INTO id_encontrado
             FROM Clientes c
@@ -23,8 +23,7 @@ BEGIN
             c.primer_apellido = primer_apellido;
             RETURN id_encontrado;
         EXCEPTION
-            WHEN NO_DATA_FOUND THEN
-                RETURN NULL;
+            WHEN NO_DATA_FOUND THEN NULL;
             WHEN TOO_MANY_ROWS THEN
                 RAISE_APPLICATION_ERROR(-20001, 'Error: Existen múltiples clientes llamados ' || p_nombre || ' ' || p_apellido || '. Se requiere documento de identidad para diferenciar.');
         END;
@@ -48,6 +47,71 @@ BEGIN
 
     RETURN NULL;
 END buscar_juguete;
+
+-- Capaz deba agregarle el país tmb
+CREATE OR REPLACE FUNCTION buscar_tienda (nombre_tienda IN varchar2(50),nombre_ciudad IN varchar2(30))
+RETURN number(4) IS
+    id_tienda number(4);
+    id_ciudad number(5);
+    id_pais   number(3);
+    id_estado number(5);
+BEGIN
+    IF (nombre_tienda IS NOT NULL) AND (nombre_ciudad IS NULL) THEN
+        BEGIN
+            SELECT t.id INTO id_tienda
+            FROM Tienda t
+            WHERE t.nombre = nombre_ciudad
+            RETURN id_tienda
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN NULL;
+            WHEN TOO_MANY_ROWS THEN
+                RAISE_APPLICATION_ERROR(-20002, 'Error: Existen muchas tiendas llamadas: '||nombre_tienda||'. Especifique la ciudad por favor');
+        END;
+    END IF;
+
+    IF (nombre_tienda IS NULL) AND (nombre_ciudad IS NOT NULL) THEN
+        BEGIN
+            SELECT c.id_pais_est INTO id_pais, c.id_estado INTO id_estado, c.id INTO id_ciudad
+            FROM Ciudad c
+            WHERE c.nombre = nombre_ciudad;
+
+            SELECT t.id INTO id_tienda
+            FROM Tienda t
+            WHERE t.id_ciudad = id_ciudad AND
+            t.id_estado_ciu = id_estado AND
+            t.id_pais_ciu = id_pais
+
+            RETURN id_tienda;
+
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN NULL;
+            WHEN TOO_MANY_ROWS THEN
+                RAISE_APPLICATION_ERROR(-20003, 'Error: Existen muchas tiendas en la ciudad: '||nombre_ciudad||'. Especifique el nombre de la tienda por favor');
+        END;
+    END IF;
+
+    IF (nombre_tienda IS NOT NULL) AND (nombre_ciudad IS NOT NULL) THEN
+        BEGIN
+            SELECT c.id_pais_est INTO id_pais, c.id_estado INTO id_estado, c.id INTO id_ciudad
+            FROM Ciudad c
+            WHERE c.nombre = nombre_ciudad;
+
+            SELECT t.id INTO id_tienda
+            FROM Tienda t
+            WHERE t.nombre = nombre_ciudad AND 
+            t.id_ciudad = id_ciudad AND
+            t.id_estado_ciu = id_estado AND
+            t.id_pais_ciu = id_pais
+
+            RETURN id_tienda;
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN NULL;
+        END;
+    END IF;
+
+    RETURN NULL;
+
+END buscar_tienda;
 
 ----------------------------
 -- TRIGGERS VENTA FÍSICA --

@@ -202,7 +202,7 @@ BEGIN
         FROM clientes c
         WHERE c.id_lego = :NEW.ID_LEGO_CLI;
         
-        V_EDAD := TRUNC(MONTHS_BETWEEN(V_FECHA_TOUR, V_FECHA_NAC) / 12);
+        V_EDAD := fn_calcular_edad(v_fecha_nac);
         
         IF V_EDAD < 21 THEN
             RAISE_APPLICATION_ERROR(-20001, 'Error de Inscripcion: El cliente con ID ' || :NEW.ID_LEGO_CLI || ' tiene ' || V_EDAD || ' años y debe ser mayor de 21 para inscribirse.');
@@ -215,7 +215,7 @@ BEGIN
         FROM fan_lego_menores f
         WHERE f.id_lego = :NEW.ID_LEGO_FAN;
         
-        V_EDAD := TRUNC(MONTHS_BETWEEN(V_FECHA_TOUR, V_FECHA_NAC) / 12);
+        V_EDAD := fn_calcular_edad(v_fecha_nac);
         
         IF V_EDAD < 12 OR V_EDAD > 20 THEN
             RAISE_APPLICATION_ERROR(-20002, 'Error de Inscripcion: El Fan Lego con ID ' || :NEW.ID_LEGO_FAN || ' tiene ' || V_EDAD || ' años. Solo se permiten participantes entre 12 y 20 años.');

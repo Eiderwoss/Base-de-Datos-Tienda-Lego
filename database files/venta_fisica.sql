@@ -3,6 +3,16 @@ START WITH 1
 INCREMENT BY 1
 NOCACHE;
 
+CREATE SEQUENCE seq_factura_venta_tienda
+START WITH 1
+INCREMENT BY 1
+NOCACHE;
+
+CREATE SEQUENCE seq_detalle_venta_tienda
+START WITH 1
+INCREMENT BY 1
+NOCACHE;
+
 CREATE OR REPLACE TYPE juguetes_obj AS OBJECT (
     nombre varchar2(60),
     cantidad number(2),
@@ -15,8 +25,15 @@ CREATE OR REPLACE TYPE id_juguetes_obj AS OBJECT (
     tipo_cliente varchar2(6)
 );
 
+CREATE OR REPLACE TYPE lotes_juguetes_cantidades AS OBJECT (
+    id number (4),
+    cantidad number(2),
+    num_lote number (8),
+)
+
 CREATE OR REPLACE TYPE lista_juguetes IS TABLE OF juguetes_obj;
 CREATE OR REPLACE TYPE lista_id_juguetes IS TABLE OF id_juguetes_obj;
+CREATE OR REPLACE TYPE lista_para_detalle IS TABLE OF lotes_juguetes_cantidades;
 
 ---------------------------------------------
 -- PROCEDIMIENTOS/FUNCIONES VENTA FÍSICA --
@@ -51,7 +68,7 @@ BEGIN
     END IF;
     
     RETURN NULL;
-END buscar_cliente;
+END fn_fisica_buscar_cliente;
 
 CREATE OR REPLACE FUNCTION fn_fisica_buscar_juguete (nombre_juguete IN varchar2(60))
 RETURN number(4) IS id_juguete number(4);
@@ -67,7 +84,7 @@ BEGIN
     END IF;
 
     RETURN NULL;
-END buscar_juguete;
+END fn_fisica_buscar_juguete;
 
 CREATE OR REPLACE FUNCTION fn_fisica_buscar_tienda (nombre_tienda IN varchar2(50),nombre_ciudad IN varchar2(30),nombre_pais IN varchar2(30))
 RETURN number(4) IS
@@ -142,9 +159,10 @@ BEGIN
 
     RETURN NULL;
 
-END buscar_tienda;
+END fn_fisica_buscar_tienda;
 
-CREATE OR REPLACE PROCEDURE pr_fisica_descontar_stock (juguetes IN lista_id_juguetes, id_tienda IN number(4)) IS
+CREATE OR REPLACE FUNCTION fn_fisica_descontar_stock (juguetes IN lista_id_juguetes, id_tienda IN number(4))
+RETURN lista_para_detalle IS
 CURSOR fila_lote (id_juguete_buscado number(4)) IS  SELECT i.num_lote, i.cantidad
                                                     FROM inventario_lotes i 
                                                     WHERE i.id_tienda = id_tienda AND 
@@ -154,6 +172,7 @@ CURSOR fila_lote (id_juguete_buscado number(4)) IS  SELECT i.num_lote, i.cantida
     lote fila_lote%rowtype;
     cantidad_pendiente NUMBER;
     cantidad_tomar     NUMBER;
+    lista_respuesta lista_para_detalle := lista_para_detalle();
 BEGIN
     FOR i IN 1 .. juguetes.COUNT 
     LOOP
@@ -165,7 +184,8 @@ BEGIN
             EXIT WHEN cantidad_pendiente = 0;
             
             cantidad_tomar := LEAST (lote.cantidad,cantidad_pendiente);
-            
+            lista_respuesta.EXTEND;
+            lista_respuesta(i) := lotes_juguetes_cantidades(juguetes(i).id, cantidad_tomar, lote.num_lote);
             INSERT INTO descuento_lotes VALUES (juguetes(i).id, id_tienda, lote.num_lote, seq_descuento_lote.nextval, SYSDATE, cantidad_tomar);
             
             /*Trigger para validar cantidades negativas*/
@@ -183,7 +203,9 @@ BEGIN
                 '. Se requerían ' || juguetes(i).cantidad || 
                 ' pero solo se encontraron ' || (juguetes(i).cantidad - cantidad_pendiente));
         END IF;
-    END LOOP;   
+    END LOOP; 
+
+    RETURN lista_respuesta;
 EXCEPTION
     WHEN OTHERS THEN
         IF fila_lote%ISOPEN THEN 
@@ -192,6 +214,73 @@ EXCEPTION
         RAISE;
 END pr_fisica_descontar_stock;
 /
+
+CREATE OR REPLACE PROCEDURE pr_fisica_agregar_factura (juguetes IN lista_juguetes, nombre_tienda IN varchar2(50), nombre_ciudad IN varchar2(30), 
+nombre_pais varchar2(30), primer_nombre_cliente IN varchar2(10), primer_apellido_cliente IN varchar2(10) documento_identidad IN number (9)) IS
+    id_juguetes lista_id_juguetes := lista_id_juguetes();
+    id_temporal_juguete number(4);
+    id_tienda number(4);
+    id_cliente number(6);
+    cantidad_disponible number(4);
+    total number (6,2);
+    id_factura_actual number(7);
+    lista_lotes lotes_juguetes_cantidades: = lotes_juguetes_cantidades ();
+    precio_total number (6, 2);
+BEGIN
+    id_tienda := fn_fisica_buscar_tienda (nombre_tienda, nombre_ciudad, nombre_pais);
+    id_cliente := fn_fisica_buscar_cliente (primer_nombre_cliente, primer_apellido_cliente, documento_identidad);
+    IF (id_tienda IS NOT NULL) AND (id_cliente IS NOT NULL) AND (juguetes IS NOT NULL)THEN
+        BEGIN
+            FOR i IN 1 .. juguetes.COUNT
+            LOOP
+                id_juguetes.EXTEND;
+                id_temporal_juguete := fn_fisica_buscar_juguete(juguetes(i).nombre);
+                IF  id_temporal_juguete IS NOT NULL THEN
+                    BEGIN
+                        SELECT SUM(i.cantidad) INTO cantidad_disponible;
+                        FROM inventario_lotes i
+                        WHERE i.id_tienda = id_tienda AND
+                        i.id_juguete = id_temporal_juguete;
+                        
+                        IF cantidad_disponible > 0 THEN
+                            BEGIN
+                                id_juguetes(i) = id_juguetes_obj(id_temporal_juguete, juguetes(i).cantidad, juguetes(i).tipo_cliente);
+                            END;
+                        END IF;
+                    END;
+                END IF;
+            END LOOP;
+
+            INSERT INTO factura_ventas_tienda VALUES (id_tienda, seq_factura_venta_tienda.nextval, SYSDATE, id_cliente, NULL);
+            id_factura_actual := seq_factura_venta_tienda.currval;
+            lista_lotes = fn_fisica_descontar_stock(id_juguetes, id_tienda);
+            FOR j IN 1 .. id_juguetes.COUNT
+            LOOP
+                FOR k in 1 .. lista_lotes.COUNT
+                LOOP
+                    IF lista_lotes(k).id = id_juguetes(j).id THEN
+                        BEGIN
+                            INSERT INTO detalle_factura_ventas_tienda VALUES (id_tienda, id_factura_actual, seq_detalle_venta_tienda.nextval, 
+                            lista_lotes(k).cantidad, id_juguete(j).tipo_cliente, id_juguete(j).id, id_tienda, lista_lotes(k).num_lote);
+                        END;
+                    END IF;
+                END LOOP;
+
+                SELECT h.precio INTO precio_total
+                FROM historico_precios h
+                WHERE h.id_juguete = id_juguetes(j).id AND
+                h.fecha_fin = NULL;
+
+                precio_total := precio_total * id_juguetes(j).cantidad;
+            EXCEPTION
+            END LOOP;
+            UPDATE factura_ventas_tienda f 
+            SET total = precio_total 
+            WHERE f.numeroventa = id_factura_actual AND f.id_lego_cliente = id_cliente AND f.id_tienda = id_tienda;
+        END;
+    END IF;
+EXCEPTION
+END;
 
 ----------------------------
 -- TRIGGERS VENTA FÍSICA --

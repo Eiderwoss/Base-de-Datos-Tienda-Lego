@@ -161,7 +161,7 @@ BEGIN
 
 END fn_fisica_buscar_tienda;
 
-CREATE OR REPLACE FUNCTION fn_fisica_descontar_stock (juguetes IN lista_id_juguetes, id_tienda IN number(4))
+CREATE OR REPLACE FUNCTION fn_fisica_seleccionar_stock (juguetes IN lista_id_juguetes, id_tienda IN number(4))
 RETURN lista_para_detalle IS
 CURSOR fila_lote (id_juguete_buscado number(4)) IS  SELECT i.num_lote, i.cantidad
                                                     FROM inventario_lotes i 
@@ -170,10 +170,13 @@ CURSOR fila_lote (id_juguete_buscado number(4)) IS  SELECT i.num_lote, i.cantida
                                                     i.cantidad > 0
                                                     ORDER BY num_lote ASC;
     lote fila_lote%rowtype;
-    cantidad_pendiente NUMBER;
-    cantidad_tomar     NUMBER;
+    cantidad_pendiente number(3);
+    cantidad_tomar     number(3);
+    cantidad_hoy number(3);
+    fecha_hoy date;
     lista_respuesta lista_para_detalle := lista_para_detalle();
 BEGIN
+    fecha_hoy := TRUNC(SYSDATE);
     FOR i IN 1 .. juguetes.COUNT 
     LOOP
         cantidad_pendiente := juguetes(i).cantidad;
@@ -182,18 +185,24 @@ BEGIN
             FETCH fila_lote INTO lote;
             EXIT WHEN fila_lote%NOTFOUND;
             EXIT WHEN cantidad_pendiente = 0;
-            
-            cantidad_tomar := LEAST (lote.cantidad,cantidad_pendiente);
-            lista_respuesta.EXTEND;
-            lista_respuesta(i) := lotes_juguetes_cantidades(juguetes(i).id, cantidad_tomar, lote.num_lote);
-            INSERT INTO descuento_lotes VALUES (juguetes(i).id, id_tienda, lote.num_lote, seq_descuento_lote.nextval, SYSDATE, cantidad_tomar);
-            
-            /*Trigger para validar cantidades negativas*/
-            UPDATE inventario_lotes
-            SET cantidad = cantidad - cantidad_tomar
-            WHERE num_lote = lote.num_lote;
 
-            cantidad_pendiente := cantidad_pendiente - cantidad_tomar;
+            SELECT NVL(SUM(d.cantidad), 0) INTO cantidad_hoy
+            FROM descuento_lotes d
+            WHERE d.num_lote = lote.num_lote AND
+            d.id_juguete_inv = juguetes(i).id AND
+            d.id_tienda_inv = id_tienda AND
+            TRUNC(d.fecha) = fecha_hoy;
+
+            IF (lote.cantidad - cantidad_hoy > 0) THEN
+                BEGIN
+                    cantidad_tomar := LEAST (lote.cantidad - cantidad_hoy, cantidad_pendiente);
+                    lista_respuesta.EXTEND;
+                    lista_respuesta(lista_respuesta.LAST) := lotes_juguetes_cantidades(juguetes(i).id, cantidad_tomar, lote.num_lote);
+                    INSERT INTO descuento_lotes VALUES (juguetes(i).id, id_tienda, lote.num_lote, seq_descuento_lote.nextval, SYSDATE, cantidad_tomar);
+
+                    cantidad_pendiente := cantidad_pendiente - cantidad_tomar;
+                END;
+            END IF;
         END LOOP;
 
         CLOSE fila_lote;
@@ -212,7 +221,7 @@ EXCEPTION
             CLOSE fila_lote; 
         END IF;
         RAISE;
-END pr_fisica_descontar_stock;
+END fn_fisica_seleccionar_stock;
 /
 
 CREATE OR REPLACE PROCEDURE pr_fisica_agregar_factura (juguetes IN lista_juguetes, nombre_tienda IN varchar2(50), nombre_ciudad IN varchar2(30), 
@@ -253,7 +262,7 @@ BEGIN
 
             INSERT INTO factura_ventas_tienda VALUES (id_tienda, seq_factura_venta_tienda.nextval, SYSDATE, id_cliente, NULL);
             id_factura_actual := seq_factura_venta_tienda.currval;
-            lista_lotes = fn_fisica_descontar_stock(id_juguetes, id_tienda);
+            lista_lotes = fn_fisica_seleccionar_stock(id_juguetes, id_tienda);
             FOR j IN 1 .. id_juguetes.COUNT
             LOOP
                 FOR k in 1 .. lista_lotes.COUNT

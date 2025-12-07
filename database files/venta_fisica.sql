@@ -1,7 +1,27 @@
+CREATE SEQUENCE seq_descuento_lote
+START WITH 1
+INCREMENT BY 1
+NOCACHE;
+
+CREATE OR REPLACE TYPE juguetes_obj AS OBJECT (
+    nombre varchar2(60),
+    cantidad number(2),
+    tipo_cliente varchar2(6)
+);
+
+CREATE OR REPLACE TYPE id_juguetes_obj AS OBJECT (
+    id number(4),
+    cantidad number(2),
+    tipo_cliente varchar2(6)
+);
+
+CREATE OR REPLACE TYPE lista_juguetes IS TABLE OF juguetes_obj;
+CREATE OR REPLACE TYPE lista_id_juguetes IS TABLE OF id_juguetes_obj;
+
 ---------------------------------------------
 -- PROCEDIMIENTOS/FUNCIONES VENTA FÍSICA --
 ---------------------------------------------
-CREATE OR REPLACE FUNCTION buscar_cliente (primer_nombre IN varchar2(10), primer_apellido IN varchar2(10), documento_identidad IN number(9))
+CREATE OR REPLACE FUNCTION fn_fisica_buscar_cliente (primer_nombre IN varchar2(10), primer_apellido IN varchar2(10), documento_identidad IN number(9))
 RETURN number(6) IS id_encontrado number(6);
 BEGIN
     IF documento_identidad IS NOT NULL THEN
@@ -32,7 +52,7 @@ BEGIN
     RETURN NULL;
 END buscar_cliente;
 
-CREATE OR REPLACE FUNCTION buscar_juguete (nombre_juguete IN varchar2(60))
+CREATE OR REPLACE FUNCTION fn_fisica_buscar_juguete (nombre_juguete IN varchar2(60))
 RETURN number(4) IS id_juguete number(4);
 BEGIN
     IF nombre_juguete IS NOT NULL THEN
@@ -48,8 +68,7 @@ BEGIN
     RETURN NULL;
 END buscar_juguete;
 
--- Capaz deba agregarle el país tmb
-CREATE OR REPLACE FUNCTION buscar_tienda (nombre_tienda IN varchar2(50),nombre_ciudad IN varchar2(30),nombre_pais IN varchar2(30))
+CREATE OR REPLACE FUNCTION fn_fisica_buscar_tienda (nombre_tienda IN varchar2(50),nombre_ciudad IN varchar2(30),nombre_pais IN varchar2(30))
 RETURN number(4) IS
     id_tienda number(4);
     id_ciudad number(5);
@@ -59,7 +78,7 @@ BEGIN
     IF (nombre_tienda IS NOT NULL) AND (nombre_ciudad IS NULL) AND (nombre_pais IS NULL) THEN
         BEGIN
             SELECT t.id INTO id_tienda
-            FROM Tienda t
+            FROM tienda t
             WHERE t.nombre = nombre_ciudad;
 
             RETURN id_tienda;
@@ -72,17 +91,18 @@ BEGIN
 
     IF (nombre_tienda IS NULL) AND (nombre_ciudad IS NOT NULL) AND (nombre_pais IS NOT NULL) THEN
         BEGIN
+            /*Unificar las consultas*/
             SELECT p.id INTO id_pais
-            FROM Pais p
+            FROM pais p
             WHERE p.nombre = nombre_pais;
 
-            SELECT c.id_estado INTO id_estado, c.id INTO id_ciudad
-            FROM Ciudad c
+            SELECT c.id_estado, c.id INTO id_estado, id_ciudad
+            FROM ciudad c
             WHERE c.nombre = nombre_ciudad AND
             c.id_pais_est = id_pais;
 
             SELECT t.id INTO id_tienda
-            FROM Tienda t
+            FROM tienda t
             WHERE t.id_ciudad = id_ciudad AND
             t.id_estado_ciu = id_estado AND
             t.id_pais_ciu = id_pais
@@ -98,17 +118,18 @@ BEGIN
 
     IF (nombre_tienda IS NOT NULL) AND (nombre_ciudad IS NOT NULL) AND (nombre_pais IS NOT NULL) THEN
         BEGIN
+            /*Unificar las consultas*/
             SELECT p.id INTO id_pais
-            FROM Pais p
+            FROM pais p
             WHERE p.nombre = nombre_pais;
 
-            SELECT c.id_estado INTO id_estado, c.id INTO id_ciudad
-            FROM Ciudad c
+            SELECT c.id_estado, c.id INTO id_estadoINTO, id_ciudad
+            FROM ciudad c
             WHERE c.nombre = nombre_ciudad AND
             c.id_pais_est = id_pais;
 
             SELECT t.id INTO id_tienda
-            FROM Tienda t
+            FROM tienda t
             WHERE t.nombre = nombre_ciudad AND 
             t.id_ciudad = id_ciudad AND
             t.id_estado_ciu = id_estado AND
@@ -123,6 +144,55 @@ BEGIN
     RETURN NULL;
 
 END buscar_tienda;
+
+CREATE OR REPLACE PROCEDURE pr_fisica_descontar_stock (juguetes IN lista_id_juguetes, id_tienda IN number(4)) IS
+CURSOR fila_lote (id_juguete_buscado number(4)) IS  SELECT i.num_lote, i.cantidad
+                                                    FROM inventario_lotes i 
+                                                    WHERE i.id_tienda = id_tienda AND 
+                                                    i.id_juguete = id_juguete_buscado AND
+                                                    i.cantidad > 0
+                                                    ORDER BY num_lote ASC;
+    lote fila_lote%rowtype;
+    cantidad_pendiente NUMBER;
+    cantidad_tomar     NUMBER;
+BEGIN
+    FOR i IN 1 .. juguetes.COUNT 
+    LOOP
+        cantidad_pendiente := juguetes(i).cantidad;
+        OPEN fila_lote (juguetes(i).id);
+        LOOP
+            FETCH fila_lote INTO lote;
+            EXIT WHEN fila_lote%NOTFOUND;
+            EXIT WHEN cantidad_pendiente = 0;
+            
+            cantidad_tomar := LEAST (lote.cantidad,cantidad_pendiente);
+            
+            INSERT INTO descuento_lotes VALUES (juguetes(i).id, id_tienda, lote.num_lote, seq_descuento_lote.nextval, SYSDATE, cantidad_tomar);
+            
+            /*Trigger para validar cantidades negativas*/
+            UPDATE inventario_lotes
+            SET cantidad = cantidad - cantidad_tomar
+            WHERE num_lote = lote.num_lote;
+
+            cantidad_pendiente := cantidad_pendiente - cantidad_tomar;
+        END LOOP;
+
+        CLOSE fila_lote;
+        IF cantidad_pendiente > 0 THEN
+            RAISE_APPLICATION_ERROR(-20004, 
+                'Stock insuficiente para el juguete ID ' || juguetes(i).id || 
+                '. Se requerían ' || juguetes(i).cantidad || 
+                ' pero solo se encontraron ' || (juguetes(i).cantidad - cantidad_pendiente));
+        END IF;
+    END LOOP;   
+EXCEPTION
+    WHEN OTHERS THEN
+        IF fila_lote%ISOPEN THEN 
+            CLOSE fila_lote; 
+        END IF;
+        RAISE;
+END pr_fisica_descontar_stock;
+/
 
 ----------------------------
 -- TRIGGERS VENTA FÍSICA --
@@ -176,4 +246,3 @@ BEGIN
     END IF;
 END;
 / */
-

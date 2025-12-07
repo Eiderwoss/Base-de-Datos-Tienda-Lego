@@ -237,7 +237,7 @@ BEGIN
 
         LOOP
             v_pos_coma := INSTR(v_lista_trabajo, ',');
-            EXIT WHEN v_pos_coma = 0;
+            EXIT WHEN NVL(v_pos_coma, 0) = 0;
 
             -- Cortamos el bloque "ID:CANTIDAD"
             v_bloque := SUBSTR(v_lista_trabajo, 1, v_pos_coma - 1);

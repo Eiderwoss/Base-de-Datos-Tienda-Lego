@@ -21,6 +21,7 @@ CREATE OR REPLACE TYPE lista_id_juguetes IS TABLE OF id_juguetes_obj;
 ---------------------------------------------
 -- PROCEDIMIENTOS/FUNCIONES VENTA FÍSICA --
 ---------------------------------------------
+
 CREATE OR REPLACE FUNCTION fn_fisica_buscar_cliente (primer_nombre IN varchar2(10), primer_apellido IN varchar2(10), documento_identidad IN number(9))
 RETURN number(6) IS id_encontrado number(6);
 BEGIN
@@ -71,15 +72,12 @@ END buscar_juguete;
 CREATE OR REPLACE FUNCTION fn_fisica_buscar_tienda (nombre_tienda IN varchar2(50),nombre_ciudad IN varchar2(30),nombre_pais IN varchar2(30))
 RETURN number(4) IS
     id_tienda number(4);
-    id_ciudad number(5);
-    id_pais   number(3);
-    id_estado number(5);
 BEGIN
     IF (nombre_tienda IS NOT NULL) AND (nombre_ciudad IS NULL) AND (nombre_pais IS NULL) THEN
         BEGIN
             SELECT t.id INTO id_tienda
-            FROM tienda t
-            WHERE t.nombre = nombre_ciudad;
+            FROM tiendas t
+            WHERE t.nombre = nombre_tienda;
 
             RETURN id_tienda;
         EXCEPTION
@@ -91,18 +89,26 @@ BEGIN
 
     IF (nombre_tienda IS NULL) AND (nombre_ciudad IS NOT NULL) AND (nombre_pais IS NOT NULL) THEN
         BEGIN
-            /*Unificar las consultas*/
+            SELECT t.id INTO id_tienda
+            FROM paises p, ciudades c, tiendas t
+            WHERE p.nombre = nombre_pais AND
+            c.nombre = nombre_ciudad AND
+            p.id = c.id_pais_est AND
+            c.id = t.id_ciudad AND
+            c.id_estado = t.id_estado_ciu AND
+            c.id_pais_est = t.id_pais_ciu
+
             SELECT p.id INTO id_pais
-            FROM pais p
+            FROM paises p
             WHERE p.nombre = nombre_pais;
 
             SELECT c.id_estado, c.id INTO id_estado, id_ciudad
-            FROM ciudad c
+            FROM ciudades c
             WHERE c.nombre = nombre_ciudad AND
             c.id_pais_est = id_pais;
 
             SELECT t.id INTO id_tienda
-            FROM tienda t
+            FROM tiendas t
             WHERE t.id_ciudad = id_ciudad AND
             t.id_estado_ciu = id_estado AND
             t.id_pais_ciu = id_pais
@@ -118,22 +124,15 @@ BEGIN
 
     IF (nombre_tienda IS NOT NULL) AND (nombre_ciudad IS NOT NULL) AND (nombre_pais IS NOT NULL) THEN
         BEGIN
-            /*Unificar las consultas*/
-            SELECT p.id INTO id_pais
-            FROM pais p
-            WHERE p.nombre = nombre_pais;
-
-            SELECT c.id_estado, c.id INTO id_estadoINTO, id_ciudad
-            FROM ciudad c
-            WHERE c.nombre = nombre_ciudad AND
-            c.id_pais_est = id_pais;
-
             SELECT t.id INTO id_tienda
-            FROM tienda t
-            WHERE t.nombre = nombre_ciudad AND 
-            t.id_ciudad = id_ciudad AND
-            t.id_estado_ciu = id_estado AND
-            t.id_pais_ciu = id_pais
+            FROM paises p, ciudades c, tiendas t
+            WHERE p.nombre = nombre_pais AND
+            c.nombre = nombre_ciudad AND
+            t.nombre = nombre_tienda AND
+            p.id = c.id_pais_est AND
+            c.id = t.id_ciudad AND
+            c.id_estado = t.id_estado_ciu AND
+            c.id_pais_est = t.id_pais_ciu
 
             RETURN id_tienda;
         EXCEPTION

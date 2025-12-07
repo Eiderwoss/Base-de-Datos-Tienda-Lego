@@ -12,6 +12,148 @@ NOCACHE;
 -- PROCEDIMIENTOS/FUNCIONES VENTA ONLINE --
 ---------------------------------------------
 
+-- Calcular saldo total dinamicamente (Suma desde la ultima factura GRATIS = 'SI')
+CREATE OR REPLACE FUNCTION fn_obtener_saldo_puntos (
+    p_id_cliente IN NUMBER
+)
+RETURN NUMBER IS
+    v_saldo_acumulado NUMBER := 0;
+    v_ultima_venta_gratis NUMBER;
+BEGIN
+    BEGIN
+        SELECT MAX(numeroventa)
+        INTO v_ultima_venta_gratis
+        FROM Factura_Ventas_Online
+        WHERE id_lego_cliente = p_id_cliente    
+            AND gratis = 'SI';
+        
+    
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            v_ultima_venta_gratis := NULL;
+    END;
+    
+    IF v_ultima_venta_gratis IS NULL THEN
+        SELECT NVL(SUM(puntos_generados), 0)
+        INTO v_saldo_acumulado
+        FROM Factura_Ventas_Online
+        WHERE id_lego_cliente= p_id_cliente;
+    ELSE
+        SELECT NVL(SUM(puntos_generados), 0)
+        INTO v_saldo_acumulado
+        FROM Factura_Ventas_Online
+        WHERE id_lego_cliente = p_id_cliente
+            AND numeroventa > v_ultima_venta_gratis;
+    END IF;
+    
+    RETURN v_saldo_acumulado;
+    
+END;
+/
+
+-- Validar canjeo de puntos
+CREATE OR REPLACE PROCEDURE sp_validar_canje_puntos (
+    p_id_cliente IN NUMBER,
+    p_puntos_usar IN NUMBER
+) IS
+    v_saldo_actual NUMBER;
+BEGIN
+    -- Calcular el saldo actual de forma dinamica
+    v_saldo_actual := fn_obtener_saldo_puntos(p_id_cliente);
+    
+    -- Validar saldo y cantidad a usar
+    IF p_puntos_usar <= 0 THEN
+        RAISE_APPLICATION_ERROR(-20042, 'No tienes puntos para usar.');
+    ELSIF v_saldo_actual < p_puntos_usar THEN
+        RAISE_APPLICATION_ERROR(-20040, 'Saldo insuficiente. El cliente solo tiene ' || v_saldo_actual || ' puntos acumulados en su ciclo actual.');
+    END IF;
+    
+    -- Si la validacion pasa, el canje es posible.
+    -- La ejecucion del gasto (el reseteo de puntos) se completa
+    -- cuando se inserta una nueva factura con gratis = 'SI' en el futuro
+    
+    COMMIT;
+    DBMS_OUTPUT.PUT_LINE('CANJE POSIBLE. El cliente ID ' || p_id_cliente || ' puede gastar ' || p_puntos_usar || ' puntos.');
+    
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RAISE_APPLICATION_ERROR(-20041, 'Cliente con ID ' || p_id_cliente || ' no encontrado.');
+END;
+/
+
+-- Canjeo de puntos
+CREATE OR REPLACE PROCEDURE sp_canjear_puntos (
+    p_id_cliente IN NUMBER,
+    p_id_juguete_canje IN NUMBER,
+    p_puntos_requeridos IN NUMBER
+)
+IS
+    v_num_venta NUMBER;
+    v_pais_res NUMBER;
+    v_es_ue CHAR(2);
+    
+    e_saldo_insuficiente EXCEPTION;
+    PRAGMA EXCEPTION_INIT(e_saldo_insuficiente, -20040);
+BEGIN
+    -- Validacion del saldo
+    sp_validar_canje_puntos(
+        p_id_cliente => p_id_cliente,
+        p_puntos_usar => p_puntos_requeridos
+    );
+    
+    -- Obtener datos del cliente (ncesario para la validacion de catalogo en el detalle factura)
+    SELECT c.id_pais_res, p.union_europea
+    INTO v_pais_res, v_es_ue
+    FROM Clientes c
+    JOIN Paises p ON c.id_pais_res = p.id
+    WHERE c.id_lego = p_id_cliente;
+    
+    -- Crear la factura del canje
+    INSERT INTO Factura_Ventas_Online (
+        numeroventa, 
+        fecha_venta, 
+        gratis, 
+        id_lego_cliente, 
+        total, 
+        puntos_generados
+    ) VALUES (
+        NULL, 
+        SYSDATE, 
+        'SI',              -- CLAVE: Marca el canje y el reinicio del ciclo
+        p_id_cliente, 
+        0,                 -- Total pagado es 0 (asumiendo que es completamente gratuito)
+        0                  -- No genera puntos al gastar
+    )
+    RETURNING numeroventa INTO v_num_venta;
+    
+    -- Insertar el detalle
+    INSERT INTO Detalle_Factura_Ventas_Online (
+        numeroventa, 
+        id, 
+        cantidad, 
+        tipo_cliente, 
+        id_juguete_cat, 
+        id_pais_cat
+    ) VALUES (
+        v_num_venta, 
+        1, 
+        1, 
+        'ADULTO',      
+        p_id_juguete_canje, 
+        v_pais_res     
+    );
+    
+    COMMIT;
+    DBMS_OUTPUT.PUT_LINE('CANJE EXITOSO. Factura gratuita #' || v_num_venta || 
+                         ' creada. Se consumieron ' || p_puntos_requeridos || ' puntos (implicitamente).');
+    
+EXCEPTION
+    WHEN e_saldo_insuficiente THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20040, SQLERRM);
+END;
+/
+
 --10. Funcion de otorgar puntos
 CREATE OR REPLACE FUNCTION fn_calcular_puntos (p_monto_total NUMBER) 
 RETURN NUMBER IS

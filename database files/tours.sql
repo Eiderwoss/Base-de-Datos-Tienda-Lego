@@ -86,60 +86,96 @@ END;
 --13. Procedimiento de la inscripcion al tour
 CREATE OR REPLACE PROCEDURE sp_inscripcion_grupal_txt (
     p_id_cliente_pagador IN NUMBER,       
-    p_id_tour            IN NUMBER,
     p_fecha_tour         IN DATE,
-    p_cadena_personas    IN VARCHAR2 -- Ejemplo: '100:CLIENTE,10:FAN'
+    p_cadena_personas    IN VARCHAR2 -- Ejemplo: '100:CLIENTE, 10:FAN'
 ) IS
-    v_num_inscripcion NUMBER;
-    v_costo_tour      NUMBER;
-    v_next_id_detalle NUMBER := 1;
+    v_num_inscripcion  NUMBER;
+    v_costo_tour       NUMBER;
+    v_cupos_totales    NUMBER;
+    v_cupos_ocupados   NUMBER;
+    v_next_id_detalle  NUMBER := 1;
+    v_nuevo_total      NUMBER;
     
-    -- Variables para el corte de cadena
-    v_lista_trabajo   VARCHAR2(4000) := p_cadena_personas;
-    v_pos_coma        NUMBER;
-    v_pos_dos_puntos  NUMBER;
-    v_bloque_persona  VARCHAR2(100);
-    v_id_persona      NUMBER;
-    v_tipo_persona    VARCHAR2(20);
+    -- Variables para el parsing
+    v_lista_trabajo    VARCHAR2(4000) := p_cadena_personas;
+    v_pos_coma         NUMBER;
+    v_pos_dos_puntos   NUMBER;
+    v_bloque_persona   VARCHAR2(100);
+    v_id_persona       NUMBER;
+    v_tipo_persona     VARCHAR2(20);
+    
+    -- Excepción personalizada para cupos
+    e_cupos_llenos     EXCEPTION;
 BEGIN
+    -- 1. VALIDACIÓN INICIAL DE CUPOS Y EXISTENCIA TOUR
     BEGIN
-        SELECT costo INTO v_costo_tour FROM Tours WHERE id = p_id_tour;
+        -- Obtenemos costo y cupos totales del tour
+        SELECT costo, cupos_totales 
+        INTO v_costo_tour, v_cupos_totales 
+        FROM Tours 
+        WHERE fecha = p_fecha_tour;
+
+        -- Contamos cuánta gente hay ya inscrita en todo el tour
+        SELECT COUNT(*) 
+        INTO v_cupos_ocupados
+        FROM Detalle_Inscripciones
+        WHERE fecha_tour_ins = p_fecha_tour;
+        
+        -- Validamos si ya está lleno antes de empezar
+        IF v_cupos_ocupados >= v_cupos_totales THEN
+            RAISE e_cupos_llenos;
+        END IF;
+
     EXCEPTION
         WHEN NO_DATA_FOUND THEN
-            RAISE_APPLICATION_ERROR(-20020, 'El Tour especificado no existe.');
+            RAISE_APPLICATION_ERROR(-20020, 'El Tour especificado para esa fecha no existe.');
     END;
 
+    -- 2. Generar ID Inscripción (Cabecera)
     SELECT NVL(MAX(numeroinscripcion), 0) + 1 
     INTO v_num_inscripcion 
     FROM Inscripciones 
     WHERE fecha_tour = p_fecha_tour;
 
+    -- 3. Insertar Cabecera (Inicialmente en 0 o costo base)
     INSERT INTO Inscripciones (
-        fecha_tour, numeroinscripcion, fecha_inscripcion, id_tour, id_lego_cliente
+        fecha_tour, numeroinscripcion, fecha_inscripcion, estatus, total
     ) VALUES (
-        p_fecha_tour, v_num_inscripcion, SYSDATE, p_id_tour, p_id_cliente_pagador
+        p_fecha_tour, v_num_inscripcion, SYSDATE, 'PENDIENTE', 0
     );
+
+    -- 4. Insertar al PAGADOR (Siempre ocupa 1 cupo)
+    -- Verificamos cupo de nuevo (cupos_ocupados + 1)
+    IF (v_cupos_ocupados + 1) > v_cupos_totales THEN
+        RAISE e_cupos_llenos;
+    END IF;
 
     INSERT INTO Detalle_Inscripciones (
         fecha_tour_ins, numeroinscripcion, id, id_lego_cli, id_lego_fan
     ) VALUES (
         p_fecha_tour, v_num_inscripcion, v_next_id_detalle, p_id_cliente_pagador, NULL
     );
+    
+    -- Actualizamos contador de ocupados en memoria
+    v_cupos_ocupados := v_cupos_ocupados + 1;
 
+    -- 5. PROCESAR ACOMPAÑANTES (Loop)
     IF v_lista_trabajo IS NOT NULL AND LENGTH(v_lista_trabajo) > 0 THEN
-        
         v_lista_trabajo := v_lista_trabajo || ',';
         
         LOOP
             v_pos_coma := INSTR(v_lista_trabajo, ',');
-            
             EXIT WHEN v_pos_coma = 0;
             
             v_bloque_persona := SUBSTR(v_lista_trabajo, 1, v_pos_coma - 1);
-            
             v_pos_dos_puntos := INSTR(v_bloque_persona, ':');
             
             IF v_pos_dos_puntos > 0 THEN
+                -- VALIDAR CUPO PARA ESTE ACOMPAÑANTE
+                IF (v_cupos_ocupados + 1) > v_cupos_totales THEN
+                    RAISE e_cupos_llenos;
+                END IF;
+
                 v_id_persona := TO_NUMBER(SUBSTR(v_bloque_persona, 1, v_pos_dos_puntos - 1));
                 v_tipo_persona := SUBSTR(v_bloque_persona, v_pos_dos_puntos + 1);
                 
@@ -154,26 +190,69 @@ BEGIN
                         p_fecha_tour, v_num_inscripcion, v_next_id_detalle, NULL, v_id_persona
                     );
                 END IF;
+                
+                -- Ocupamos otro cupo en memoria
+                v_cupos_ocupados := v_cupos_ocupados + 1;
             END IF;
             
-            -- Recortamos la cadena principal para seguir con el siguiente
             v_lista_trabajo := SUBSTR(v_lista_trabajo, v_pos_coma + 1);
-            
         END LOOP;
     END IF;
 
+    -- 6. ACTUALIZAR EL TOTAL USANDO LA FUNCIÓN (Tu requerimiento)
+    v_nuevo_total := fn_calcular_total_inscripcion(p_fecha_tour, v_num_inscripcion);
+
+    UPDATE Inscripciones
+    SET total = v_nuevo_total
+    WHERE fecha_tour = p_fecha_tour 
+      AND numeroinscripcion = v_num_inscripcion;
+
     COMMIT;
-    DBMS_OUTPUT.PUT_LINE('Grupo procesado. ID Inscripción: ' || v_num_inscripcion || '. Total: ' || v_next_id_detalle);
+    DBMS_OUTPUT.PUT_LINE('Grupo inscrito. Total a pagar: ' || v_nuevo_total);
+
+EXCEPTION
+    WHEN e_cupos_llenos THEN
+        ROLLBACK; -- Deshacemos todo si no caben
+        RAISE_APPLICATION_ERROR(-20090, 'Error: No hay suficientes cupos en el tour para todo el grupo.');
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE; -- Re-lanza cualquier otro error (como edad, triggers, etc)
 END;
-/ 
---Ejemplo
+/
+
+
+--Calcular el total de la inscripcion
+CREATE OR REPLACE FUNCTION fn_calcular_total_inscripcion (
+    p_fecha_tour DATE,
+    p_num_insc   NUMBER
+) RETURN NUMBER IS
+    v_costo_tour NUMBER;
+    v_cantidad   NUMBER;
+    v_total      NUMBER;
 BEGIN
-    sp_inscripcion_grupal_txt(
-        p_id_cliente_pagador => 99,
-        p_id_tour            => 1,
-        p_fecha_tour         => TO_DATE('15/12/2025', 'DD/MM/YYYY'),
-        p_cadena_personas    => '100:CLIENTE, 10:FAN' 
-    );
+    -- 1. Buscamos el costo unitario del tour
+    SELECT t.costo
+    INTO v_costo_tour
+    FROM Inscripciones i
+    JOIN Tours t ON i.fecha_tour = t.fecha -- Ajustado a tu relación por fecha
+    WHERE i.fecha_tour = p_fecha_tour 
+      AND i.numeroinscripcion = p_num_insc;
+
+    -- 2. Contamos cuántas personas hay en esa inscripción
+    SELECT COUNT(*)
+    INTO v_cantidad
+    FROM Detalle_Inscripciones
+    WHERE fecha_tour_ins = p_fecha_tour
+      AND numeroinscripcion = p_num_insc;
+
+    -- 3. Calculamos
+    v_total := v_costo_tour * v_cantidad;
+
+    RETURN v_total;
+    
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RETURN 0;
 END;
 /
 

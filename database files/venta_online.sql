@@ -83,13 +83,6 @@ BEGIN
         RAISE_APPLICATION_ERROR(-20040, 'Saldo insuficiente. El cliente solo tiene ' || v_saldo_actual || ' puntos acumulados en su ciclo actual.');
     END IF;
     
-    -- Si la validacion pasa, el canje es posible.
-    -- La ejecucion del gasto (el reseteo de puntos) se completa
-    -- cuando se inserta una nueva factura con gratis = 'SI' en el futuro
-    
-    COMMIT;
-    DBMS_OUTPUT.PUT_LINE('CANJE POSIBLE. El cliente ID ' || p_id_cliente || ' puede gastar ' || p_puntos_usar || ' puntos.');
-    
 EXCEPTION
     WHEN NO_DATA_FOUND THEN
         RAISE_APPLICATION_ERROR(-20041, 'Cliente con ID ' || p_id_cliente || ' no encontrado.');
@@ -134,10 +127,10 @@ BEGIN
     ) VALUES (
         NULL, 
         SYSDATE, 
-        'SI',              -- CLAVE: Marca el canje y el reinicio del ciclo
+        'SI',              
         p_id_cliente, 
-        0,                 -- Total pagado es 0 (asumiendo que es completamente gratuito)
-        0                  -- No genera puntos al gastar
+        0,                
+        0                 
     )
     RETURNING numeroventa INTO v_num_venta;
     
@@ -160,16 +153,22 @@ BEGIN
     
     COMMIT;
     DBMS_OUTPUT.PUT_LINE('CANJE EXITOSO. Factura gratuita #' || v_num_venta || 
-                         ' creada. Se consumieron ' || p_puntos_requeridos || ' puntos (implicitamente).');
+                         ' creada. Se consumieron ' || p_puntos_requeridos || ' puntos.');
     
 EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20041, 'Cliente ID ' || p_id_cliente || ' no encontrado. Asegurese de que existe en la tabla Clientes.');
     WHEN e_saldo_insuficiente THEN
         ROLLBACK;
         RAISE_APPLICATION_ERROR(-20040, SQLERRM);
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20099, 'Error inesperado al procesar canje: ' || SQLERRM);
 END;
 /
 
---10. Funcion de otorgar puntos
+-- Funcion de otorgar puntos
 CREATE OR REPLACE FUNCTION fn_calcular_puntos (p_monto_total NUMBER) 
 RETURN NUMBER IS
     v_puntos NUMBER := 0;
@@ -182,11 +181,11 @@ BEGIN
     ELSIF p_monto_total >= 10 AND p_monto_total <= 70 THEN
         v_puntos := 20;
         
-    -- Rango C: Más de 70 hasta 200
+    -- Rango C: Mas de 70 hasta 200
     ELSIF p_monto_total > 70 AND p_monto_total <= 200 THEN
         v_puntos := 50;
         
-    -- Rango D: Más de 200 (El documento dice "+ de 200")
+    -- Rango D: Mas de 200
     ELSE
         v_puntos := 200;
     END IF;
@@ -379,3 +378,7 @@ BEGIN
 
 END;
 /
+
+
+
+

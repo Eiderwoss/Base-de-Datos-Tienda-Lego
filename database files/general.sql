@@ -81,3 +81,45 @@ BEGIN
     END IF;
 END;
 /
+
+-------------
+-- VISTAS --
+-------------
+
+-- Vista de todo el catálogo
+CREATE OR REPLACE VIEW catalogo_productos_pais AS
+SELECT 
+    p.nombre "Pais del Catalogo",
+    j.nombre "Nombre juguete",
+    j.descripcion Descripcion ,
+    j.rango_edad "Rango de Edad",
+    j.numero_piezas "Numero de Piezas",
+    h.precio Precio,
+    c.limite  "Limite Por Cliente"
+FROM 
+    paises p,
+    juguetes j,
+    catalogo_paises c,
+    historico_precios h
+WHERE
+    p.id = c.id_pais
+    AND j.id = c.id_juguete
+    AND j.id = h.id_juguete
+    AND h.fecha_fin IS NULL;
+
+-- Vista de disponibilidad de los tours
+CREATE OR REPLACE VIEW disponibilidad_tours AS
+SELECT 
+    t.fecha "Fecha del Tour",
+    t.costo Costo,
+    (t.cupos_totales - COUNT(d.id)) AS "Cupos disponibles",
+    t.cupos_totales "Capacidad Máxima"
+FROM 
+    tours t, 
+    detalle_inscripciones d
+WHERE 
+    t.fecha = d.fecha_tour_ins (+) 
+GROUP BY 
+    t.fecha, 
+    t.costo, 
+    t.cupos_totales;

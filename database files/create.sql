@@ -84,7 +84,6 @@ CREATE TABLE horarios (
     CONSTRAINT ck_hora_fin CHECK (hora_fin > hora_inicio)
 );
 
-/*Falta Regla de negocio de >= 21*/
 /*Faltan el resto de reglas de negocio con triggers/programas*/
 CREATE TABLE clientes (
     id_lego                     NUMBER(6)
@@ -277,7 +276,6 @@ CREATE TABLE detalle_factura_ventas_online (
 );
 
 /*Faltan las reglas de negocio*/
--- total > 0
 CREATE TABLE factura_ventas_tienda (
     id_tienda       NUMBER(4) NOT NULL,
     numeroventa     NUMBER(7) NOT NULL,
@@ -294,7 +292,6 @@ CREATE TABLE factura_ventas_tienda (
 );
 
 /*Faltan las reglas de negocio*/
--- cantidad > 0
 CREATE TABLE detalle_factura_ventas_tienda (
     id_tienda_fac  NUMBER(4) NOT NULL,
     numeroventa    NUMBER(7) NOT NULL,
@@ -324,8 +321,6 @@ CREATE TABLE detalle_factura_ventas_tienda (
     CONSTRAINT ck_cantidad_detalle_ventas_tienda CHECK (cantidad > 0)
 );
 
--- Costo del tour no puede ser negativo ni 0
--- Cupos disponibles no pueden ser menores a 0
 CREATE TABLE tours (
     fecha         DATE
         CONSTRAINT pk_tours PRIMARY KEY,

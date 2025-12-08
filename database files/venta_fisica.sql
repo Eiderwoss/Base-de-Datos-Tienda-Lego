@@ -354,53 +354,40 @@ END sp_fisica_agregar_factura;
 ----------------------------
 -- TRIGGERS VENTA FÍSICA --
 ----------------------------
--- TRIGGER que impida modificar las facturas/hay que ver como evitar.
-
--- 2. Trigger para actualizar stock 
--- Modificar, una consulta no puede tener eventos cómo new u old
--- Esto solo verifica si hay stock, no lo descuenta
-CREATE OR REPLACE TRIGGER descontar_stock_tienda
-AFTER INSERT ON detalle_factura_ventas_tienda
+CREATE OR REPLACE TRIGGER trg_validar_horario
+BEFORE INSERT ON factura_ventas_tienda
 FOR EACH ROW
 DECLARE
-    V_STOCK_DISPONIBLE NUMBER(4);
+    dia_semana      NUMBER;
+    fecha_venta_norm DATE; 
+    apertura        DATE;
+    cierre          DATE;
 BEGIN
-    SELECT cantidad INTO V_STOCK_DISPONIBLE
-    FROM inventario_lotes
-    WHERE id_juguete = :NEW.id_juguete_inv
-        AND id_tienda = :NEW.id_tienda_inv
-        AND num_lote = :NEW.num_lote_inv;
-    
-    IF V_STOCK_DISPONIBLE < :NEW.cantidad THEN
-        RAISE_APPLICATION_ERROR(-20103, 'Error de Stock: Stock insuficiente (' || V_STOCK_DISPONIBLE || ') para vender ' || :NEW.cantidad || ' unidades del juguete ' || :NEW.id_juguete_inv);
-    END IF;
-    
+    dia_semana := TO_NUMBER(TO_CHAR(:NEW.fecha_venta, 'D'));
+    fecha_venta_norm := TO_DATE('01/01/2000', 'DD/MM/YYYY') + (:NEW.fecha_venta - TRUNC(:NEW.fecha_venta));
+    BEGIN
+        SELECT hora_inicio, hora_fin
+        INTO apertura, cierre
+        FROM horarios
+        WHERE id_tienda = :NEW.id_tienda AND
+        numerodia = dia_semana;
+
+        IF fecha_venta_norm < apertura OR fecha_venta_norm > cierre THEN
+            RAISE_APPLICATION_ERROR(-20050, 'La tienda está cerrada. Intente dentro del horario establecido.');
+        END IF;
+
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(-20051, 'La tienda no abre este día de la semana.');
+    END;
 END;
 /
 
--- 8. Trigger Validar catalogo
--- Creo que Lúcia dijo que esto le valía verga para las tiendas físicas
--- No usar eventos cómo new u old en consultas.
-/*CREATE OR REPLACE TRIGGER trg_validar_catalogo_pais
-BEFORE INSERT ON Inventario_Lotes
+CREATE OR REPLACE TRIGGER trg_prohibir_eliminar_factura
+BEFORE DELETE ON factura_ventas_tienda
 FOR EACH ROW
-DECLARE
-    v_pais_tienda NUMBER;
-    v_existe      NUMBER;
 BEGIN
-    SELECT id_pais_ciu 
-    INTO v_pais_tienda
-    FROM Tiendas
-    WHERE id = :NEW.id_tienda;
-
-    SELECT COUNT(*)
-    INTO v_existe
-    FROM Catalogo_Paises
-    WHERE id_juguete = :NEW.id_juguete
-        AND id_pais = v_pais_tienda;
-
-    IF v_existe = 0 THEN
-        RAISE_APPLICATION_ERROR(-20011, 'ERROR: Este juguete no está autorizado para venta en el país de esta tienda.');
-    END IF;
+    RAISE_APPLICATION_ERROR(-20061, 
+        'Error de Auditoría: Las facturas de tienda no pueden ser eliminadas del sistema.');
 END;
-/ */
+/

@@ -2,204 +2,151 @@
 -- PROCEDIMIENTOS/FUNCIONES PARA TOURS--
 -----------------------------------------
 
---11. Procedimiento de inscripcion
-CREATE OR REPLACE PROCEDURE sp_inscribir_tour (
-    p_id_cliente  IN NUMBER,
-    p_id_tour     IN NUMBER,
-    p_fecha_tour  IN DATE
-) IS
-    v_num_inscripcion NUMBER;
-    v_costo_tour      NUMBER;
+CREATE OR REPLACE FUNCTION fn_cupos_disponibles (
+    p_fecha_tour DATE
+) RETURN NUMBER IS
+    v_cupos_totales  NUMBER;
+    v_ocupados       NUMBER;
+    v_disponibles    NUMBER;
 BEGIN
+    -- 1. Obtener capacidad total del tour
     BEGIN
-        SELECT costo INTO v_costo_tour 
-        FROM Tours 
-        WHERE id = p_id_tour;
+        SELECT cupos_totales 
+        INTO v_cupos_totales
+        FROM Tours
+        WHERE fecha = p_fecha_tour;
     EXCEPTION
         WHEN NO_DATA_FOUND THEN
-            RAISE_APPLICATION_ERROR(-20020, 'El Tour especificado no existe.');
+            RETURN 0; -- Si no existe el tour, 0 cupos
     END;
 
-    SELECT NVL(MAX(numeroinscripcion), 0) + 1 
-    INTO v_num_inscripcion 
-    FROM Inscripciones 
-    WHERE fecha_tour = p_fecha_tour;
+    -- 2. Contar cuántos inscritos hay en total (sumando todos los grupos)
+    SELECT COUNT(*)
+    INTO v_ocupados
+    FROM Detalle_Inscripciones
+    WHERE fecha_tour_ins = p_fecha_tour;
 
-    INSERT INTO Inscripciones (
-        fecha_tour, numeroinscripcion, fecha_inscripcion, 
-        id_tour, id_lego_cliente
-    ) VALUES (
-        p_fecha_tour, v_num_inscripcion, SYSDATE, 
-        p_id_tour, p_id_cliente
-    );
+    -- 3. Calcular resta
+    v_disponibles := v_cupos_totales - v_ocupados;
 
-    COMMIT;
-    
-    DBMS_OUTPUT.PUT_LINE('Inscripción #' || v_num_inscripcion || ' creada exitosamente.');
-    DBMS_OUTPUT.PUT_LINE('Por favor proceda a registrar los participantes en DETALLE_INSCRIPCIONES.');
-END;
-/
-
---12. Procedimiento de venta en linea
-CREATE OR REPLACE PROCEDURE sp_venta_online (
-    p_id_cliente   IN NUMBER,
-    p_total_bruto  IN NUMBER
-) IS
-    v_es_ue          CHAR(2) := 'NO';
-    v_recargo        NUMBER;
-    v_total_neto     NUMBER;
-    v_puntos_ganados NUMBER;
-    v_num_venta      NUMBER;
-BEGIN
-    IF v_es_ue = 'SI' THEN
-        v_recargo := p_total_bruto * 0.05;
-    ELSE
-        v_recargo := p_total_bruto * 0.15;
+    -- Seguridad por si hay error de datos negativos
+    IF v_disponibles < 0 THEN
+        v_disponibles := 0;
     END IF;
 
-    v_total_neto := p_total_bruto + v_recargo;
-
-    v_puntos_ganados := fn_calcular_puntos(v_total_neto);
-
-    SELECT NVL(MAX(numeroventa), 0) + 1 INTO v_num_venta FROM Factura_Ventas_Online;
-
-    INSERT INTO Factura_Ventas_Online (
-        numeroventa, 
-        fecha_venta, 
-        total, 
-        id_lego_cliente
-    ) VALUES (
-        v_num_venta, 
-        SYSDATE, 
-        v_total_neto, 
-        p_id_cliente
-    );
-
-    COMMIT;
-    
-    DBMS_OUTPUT.PUT_LINE('Venta Online #' || v_num_venta || ' generada exitosamente.');
-    DBMS_OUTPUT.PUT_LINE('Total a pagar (con envio): ' || v_total_neto);
-    DBMS_OUTPUT.PUT_LINE('Puntos de lealtad obtenidos: ' || v_puntos_ganados);
+    RETURN v_disponibles;
 END;
 /
 
---13. Procedimiento de la inscripcion al tour
-CREATE OR REPLACE PROCEDURE sp_inscripcion_grupal_txt (
+
+
+CREATE OR REPLACE PROCEDURE sp_realizar_inscripcion (
     p_id_cliente_pagador IN NUMBER,       
     p_fecha_tour         IN DATE,
-    p_cadena_personas    IN VARCHAR2 -- Ejemplo: '100:CLIENTE, 10:FAN'
+    p_lista_acompanantes IN VARCHAR2 -- Puede ser NULL si va solo
 ) IS
-    v_num_inscripcion  NUMBER;
-    v_costo_tour       NUMBER;
-    v_cupos_totales    NUMBER;
-    v_cupos_ocupados   NUMBER;
-    v_next_id_detalle  NUMBER := 1;
-    v_nuevo_total      NUMBER;
-    
-    -- Variables para el parsing
-    v_lista_trabajo    VARCHAR2(4000) := p_cadena_personas;
-    v_pos_coma         NUMBER;
-    v_pos_dos_puntos   NUMBER;
-    v_bloque_persona   VARCHAR2(100);
-    v_id_persona       NUMBER;
-    v_tipo_persona     VARCHAR2(20);
-    
-    -- Excepción personalizada para cupos
-    e_cupos_llenos     EXCEPTION;
+    -- Variables de control
+    v_num_inscripcion   NUMBER;
+    v_cupos_disponibles NUMBER;
+    v_personas_total    NUMBER := 1; -- Empieza en 1 (el pagador)
+    v_nuevo_total       NUMBER;
+    v_next_id_detalle   NUMBER := 1;
+
+    -- Variables para el Bucle (Parsing de texto)
+    v_lista_trabajo     VARCHAR2(4000) := p_lista_acompanantes;
+    v_pos_coma          NUMBER;
+    v_pos_dos_puntos    NUMBER;
+    v_bloque            VARCHAR2(100);
+    v_id_persona        NUMBER;
+    v_tipo              VARCHAR2(20);
+
 BEGIN
-    -- 1. VALIDACIÓN INICIAL DE CUPOS Y EXISTENCIA TOUR
-    BEGIN
-        -- Obtenemos costo y cupos totales del tour
-        SELECT costo, cupos_totales 
-        INTO v_costo_tour, v_cupos_totales 
-        FROM Tours 
-        WHERE fecha = p_fecha_tour;
+    -- ------------------------------------------------------------
+    -- PASO 1: CALCULAR CUÁNTOS SON EN TOTAL
+    -- ------------------------------------------------------------
+    IF p_lista_acompanantes IS NOT NULL AND LENGTH(TRIM(p_lista_acompanantes)) > 0 THEN
+        -- Contamos las comas y sumamos 1 para saber cuántos acompañantes hay
+        -- Luego sumamos el pagador que ya inicializamos en 1
+        v_personas_total := v_personas_total + REGEXP_COUNT(p_lista_acompanantes, ',') + 1;
+    END IF;
 
-        -- Contamos cuánta gente hay ya inscrita en todo el tour
-        SELECT COUNT(*) 
-        INTO v_cupos_ocupados
-        FROM Detalle_Inscripciones
-        WHERE fecha_tour_ins = p_fecha_tour;
-        
-        -- Validamos si ya está lleno antes de empezar
-        IF v_cupos_ocupados >= v_cupos_totales THEN
-            RAISE e_cupos_llenos;
-        END IF;
+    -- ------------------------------------------------------------
+    -- PASO 2: VALIDAR SI HAY CUPO PARA TODOS (Todo o Nada)
+    -- ------------------------------------------------------------
+    v_cupos_disponibles := fn_cupos_disponibles(p_fecha_tour);
 
-    EXCEPTION
-        WHEN NO_DATA_FOUND THEN
-            RAISE_APPLICATION_ERROR(-20020, 'El Tour especificado para esa fecha no existe.');
-    END;
+    IF v_personas_total > v_cupos_disponibles THEN
+        RAISE_APPLICATION_ERROR(-20095, 
+            'Cupos Insuficientes. El grupo es de ' || v_personas_total || 
+            ' personas pero solo quedan ' || v_cupos_disponibles || ' cupos disponibles.');
+    END IF;
 
-    -- 2. Generar ID Inscripción (Cabecera)
+    -- ------------------------------------------------------------
+    -- PASO 3: CREAR LA INSCRIPCIÓN (CABECERA)
+    -- ------------------------------------------------------------
     SELECT NVL(MAX(numeroinscripcion), 0) + 1 
     INTO v_num_inscripcion 
     FROM Inscripciones 
     WHERE fecha_tour = p_fecha_tour;
 
-    -- 3. Insertar Cabecera (Inicialmente en 0 o costo base)
     INSERT INTO Inscripciones (
         fecha_tour, numeroinscripcion, fecha_inscripcion, estatus, total
     ) VALUES (
         p_fecha_tour, v_num_inscripcion, SYSDATE, 'PENDIENTE', 0
     );
 
-    -- 4. Insertar al PAGADOR (Siempre ocupa 1 cupo)
-    -- Verificamos cupo de nuevo (cupos_ocupados + 1)
-    IF (v_cupos_ocupados + 1) > v_cupos_totales THEN
-        RAISE e_cupos_llenos;
-    END IF;
-
+    -- ------------------------------------------------------------
+    -- PASO 4: INSERTAR AL PAGADOR (Siempre es el ID 1 del detalle)
+    -- ------------------------------------------------------------
     INSERT INTO Detalle_Inscripciones (
         fecha_tour_ins, numeroinscripcion, id, id_lego_cli, id_lego_fan
     ) VALUES (
         p_fecha_tour, v_num_inscripcion, v_next_id_detalle, p_id_cliente_pagador, NULL
     );
-    
-    -- Actualizamos contador de ocupados en memoria
-    v_cupos_ocupados := v_cupos_ocupados + 1;
 
-    -- 5. PROCESAR ACOMPAÑANTES (Loop)
-    IF v_lista_trabajo IS NOT NULL AND LENGTH(v_lista_trabajo) > 0 THEN
-        v_lista_trabajo := v_lista_trabajo || ',';
+    -- ------------------------------------------------------------
+    -- PASO 5: BUCLE PARA INSERTAR ACOMPAÑANTES
+    -- ------------------------------------------------------------
+    IF p_lista_acompanantes IS NOT NULL AND LENGTH(TRIM(p_lista_acompanantes)) > 0 THEN
+        
+        v_lista_trabajo := v_lista_trabajo || ','; -- Truco para que el loop lea el último
         
         LOOP
             v_pos_coma := INSTR(v_lista_trabajo, ',');
             EXIT WHEN v_pos_coma = 0;
             
-            v_bloque_persona := SUBSTR(v_lista_trabajo, 1, v_pos_coma - 1);
-            v_pos_dos_puntos := INSTR(v_bloque_persona, ':');
+            -- Cortamos el bloque "ID:TIPO"
+            v_bloque := SUBSTR(v_lista_trabajo, 1, v_pos_coma - 1);
+            v_pos_dos_puntos := INSTR(v_bloque, ':');
             
             IF v_pos_dos_puntos > 0 THEN
-                -- VALIDAR CUPO PARA ESTE ACOMPAÑANTE
-                IF (v_cupos_ocupados + 1) > v_cupos_totales THEN
-                    RAISE e_cupos_llenos;
-                END IF;
-
-                v_id_persona := TO_NUMBER(SUBSTR(v_bloque_persona, 1, v_pos_dos_puntos - 1));
-                v_tipo_persona := SUBSTR(v_bloque_persona, v_pos_dos_puntos + 1);
+                v_id_persona := TO_NUMBER(SUBSTR(v_bloque, 1, v_pos_dos_puntos - 1));
+                v_tipo       := UPPER(TRIM(SUBSTR(v_bloque, v_pos_dos_puntos + 1)));
                 
                 v_next_id_detalle := v_next_id_detalle + 1;
 
-                IF UPPER(trim(v_tipo_persona)) = 'CLIENTE' THEN
+                IF v_tipo = 'CLIENTE' THEN
                     INSERT INTO Detalle_Inscripciones VALUES (
                         p_fecha_tour, v_num_inscripcion, v_next_id_detalle, v_id_persona, NULL
                     );
-                ELSIF UPPER(trim(v_tipo_persona)) = 'FAN' THEN
+                ELSIF v_tipo = 'FAN' THEN
                     INSERT INTO Detalle_Inscripciones VALUES (
                         p_fecha_tour, v_num_inscripcion, v_next_id_detalle, NULL, v_id_persona
                     );
+                ELSE
+                     RAISE_APPLICATION_ERROR(-20096, 'Tipo de participante inválido: ' || v_tipo);
                 END IF;
-                
-                -- Ocupamos otro cupo en memoria
-                v_cupos_ocupados := v_cupos_ocupados + 1;
             END IF;
             
             v_lista_trabajo := SUBSTR(v_lista_trabajo, v_pos_coma + 1);
         END LOOP;
     END IF;
 
-    -- 6. ACTUALIZAR EL TOTAL USANDO LA FUNCIÓN (Tu requerimiento)
+    -- ------------------------------------------------------------
+    -- PASO 6: CALCULAR Y ACTUALIZAR PRECIO FINAL
+    -- ------------------------------------------------------------
+    -- Usamos la función que calculaba costo * cantidad
+    -- Nota: Asegúrate de tener compilada la función fn_calcular_total_inscripcion que hicimos antes
     v_nuevo_total := fn_calcular_total_inscripcion(p_fecha_tour, v_num_inscripcion);
 
     UPDATE Inscripciones
@@ -208,18 +155,31 @@ BEGIN
       AND numeroinscripcion = v_num_inscripcion;
 
     COMMIT;
-    DBMS_OUTPUT.PUT_LINE('Grupo inscrito. Total a pagar: ' || v_nuevo_total);
+    DBMS_OUTPUT.PUT_LINE('Inscripción Grupal #' || v_num_inscripcion || ' Exitosa.');
+    DBMS_OUTPUT.PUT_LINE('Personas inscritas: ' || v_personas_total);
+    DBMS_OUTPUT.PUT_LINE('Total a Pagar: ' || v_nuevo_total);
 
 EXCEPTION
-    WHEN e_cupos_llenos THEN
-        ROLLBACK; -- Deshacemos todo si no caben
-        RAISE_APPLICATION_ERROR(-20090, 'Error: No hay suficientes cupos en el tour para todo el grupo.');
     WHEN OTHERS THEN
         ROLLBACK;
-        RAISE; -- Re-lanza cualquier otro error (como edad, triggers, etc)
+        RAISE_APPLICATION_ERROR(-20099, 'Error en inscripción: ' || SQLERRM);
 END;
 /
 
+--Pruebas del procedure
+BEGIN
+    sp_realizar_inscripcion_grupo(
+        p_id_cliente_pagador => 99,
+        p_fecha_tour         => TO_DATE('15/12/2025','DD/MM/YYYY'),
+        p_lista_acompanantes => '100:CLIENTE, 10:FAN'
+    );
+END;
+/
+BEGIN
+    sp_realizar_inscripcion_grupo(99, TO_DATE('15/12/2025','DD/MM/YYYY'), NULL);
+END;
+/
+--
 
 --Calcular el total de la inscripcion
 CREATE OR REPLACE FUNCTION fn_calcular_total_inscripcion (

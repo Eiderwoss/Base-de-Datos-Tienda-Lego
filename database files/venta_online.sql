@@ -112,9 +112,9 @@ BEGIN
     -- Obtener datos del cliente (ncesario para la validacion de catalogo en el detalle factura)
     SELECT c.id_pais_res, p.union_europea
     INTO v_pais_res, v_es_ue
-    FROM Clientes c
-    JOIN Paises p ON c.id_pais_res = p.id
-    WHERE c.id_lego = p_id_cliente;
+    FROM Paises p, Clientes c 
+    WHERE p.id = c.id_pais_res AND 
+    c.id_lego = p_id_cliente;
     
     -- Crear la factura del canje
     INSERT INTO Factura_Ventas_Online (
@@ -219,12 +219,11 @@ CREATE OR REPLACE PROCEDURE sp_venta_online_txt (
 
 BEGIN
     -- 1. Obtener Datos del Cliente (País y si pertenece a la UE para el impuesto)
-    -- Usamos JOIN con Paises para saber lo de la Unión Europea
     SELECT c.id_pais_res, p.union_europea
     INTO v_pais_res, v_es_ue
-    FROM Clientes c
-    JOIN Paises p ON c.id_pais_res = p.id
-    WHERE c.id_lego = p_id_cliente;
+    FROM Paises p, Clientes c 
+    WHERE p.id = c.id_pais_res AND 
+    c.id_lego = p_id_cliente;
 
     -- 2. Crear Factura Inicial (Total 0 por ahora)
     INSERT INTO Factura_Ventas_Online (numeroventa, fecha_venta, gratis, id_lego_cliente, total, puntos_generados)

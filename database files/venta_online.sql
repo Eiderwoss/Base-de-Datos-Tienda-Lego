@@ -151,7 +151,6 @@ BEGIN
         v_pais_res     
     );
     
-    COMMIT;
     DBMS_OUTPUT.PUT_LINE('CANJE EXITOSO. Factura gratuita #' || v_num_venta || 
                          ' creada. Se consumieron ' || p_puntos_requeridos || ' puntos.');
     
@@ -295,7 +294,6 @@ BEGIN
         puntos_generados = v_puntos
     WHERE numeroventa = v_num_venta;
 
-    COMMIT;
     DBMS_OUTPUT.PUT_LINE('Venta Online #' || v_num_venta || ' generada.');
     DBMS_OUTPUT.PUT_LINE('Total pagado: ' || v_total_neto || ' (Envío: ' || v_recargo || ')');
     DBMS_OUTPUT.PUT_LINE('Puntos ganados: ' || v_puntos);

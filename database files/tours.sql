@@ -154,7 +154,6 @@ BEGIN
     WHERE fecha_tour = p_fecha_tour 
       AND numeroinscripcion = v_num_inscripcion;
 
-    COMMIT;
     DBMS_OUTPUT.PUT_LINE('Inscripción Grupal #' || v_num_inscripcion || ' Exitosa.');
     DBMS_OUTPUT.PUT_LINE('Personas inscritas: ' || v_personas_total);
     DBMS_OUTPUT.PUT_LINE('Total a Pagar: ' || v_nuevo_total);

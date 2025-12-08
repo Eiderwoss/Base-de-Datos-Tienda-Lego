@@ -196,7 +196,7 @@ END;
 
 CREATE OR REPLACE PROCEDURE sp_venta_online_txt (
     p_id_cliente      IN NUMBER(6),
-    p_lista_productos IN VARCHAR2 -- Ejemplo: '201:1, 101:2'
+    p_lista_productos IN VARCHAR2(4000) -- Ejemplo: '201:1, 101:2'
 ) IS
     -- Variables de Cabecera
     v_num_venta      NUMBER(7);

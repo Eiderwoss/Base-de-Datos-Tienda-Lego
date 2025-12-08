@@ -43,7 +43,7 @@ END;
 CREATE OR REPLACE PROCEDURE sp_realizar_inscripcion (
     p_id_cliente_pagador IN NUMBER(6),       
     p_fecha_tour         IN DATE,
-    p_lista_acompanantes IN VARCHAR2 -- Puede ser NULL si va solo
+    p_lista_acompanantes IN VARCHAR2(4000) -- Puede ser NULL si va solo
 ) IS
     -- Variables de control
     v_num_inscripcion   NUMBER(4);

@@ -73,6 +73,7 @@ CREATE TABLE telefonos (
 
 /*El formateo de las horas en un trigger? Si, al hacer un insert se formatea*/
 /*Faltan reglas de negocio respecto a numerodia en triggers*/
+-- CHECK hora_fin siempre es > a hora_inicio
 CREATE TABLE horarios (
     id_tienda   NUMBER(4) NOT NULL,
     numerodia   NUMBER(1) NOT NULL,
@@ -141,6 +142,7 @@ CREATE TABLE temas (
     CONSTRAINT ck_tipo CHECK ( tipo IN ( 'SERIE', 'TEMA' ) )
 );
 
+-- Instrucciones UQ
 CREATE TABLE juguetes (
     id            NUMBER(4)
         CONSTRAINT pk_juguetes PRIMARY KEY,
@@ -166,6 +168,8 @@ CREATE TABLE juguetes (
 );
 
 /*Faltan los triggers/programas de las reglas de negocio*/
+-- CONSTRAINT PRECIO NO PUEDE SER 0 ni negativo
+-- constraint fecha fin > a fecha inicio
 CREATE TABLE historico_precios (
     id_juguete   NUMBER(4) NOT NULL,
     fecha_inicio DATE NOT NULL,
@@ -190,6 +194,7 @@ CREATE TABLE prod_relaciones (
 );
 
 /*Aplicarle el trigger para descontarle la cantidad al lote según el descuento_lotes*/
+-- Cantidad no puede ser negativa CONSTRAINT
 CREATE TABLE inventario_lotes (
     id_juguete NUMBER(4) NOT NULL,
     id_tienda  NUMBER(4) NOT NULL,
@@ -205,6 +210,7 @@ CREATE TABLE inventario_lotes (
 );
 
 /*Faltan las reglas de negocio respectivas*/
+-- Cantidad no puede ser negativa CONSTRAINT
 CREATE TABLE descuento_lotes (
     id_juguete_inv NUMBER(4) NOT NULL,
     id_tienda_inv  NUMBER(4) NOT NULL,
@@ -226,6 +232,7 @@ CREATE TABLE descuento_lotes (
                       id )
 );
 
+-- constraints limite > 0
 CREATE TABLE catalogo_paises (
     id_juguete NUMBER(4) NOT NULL,
     id_pais    NUMBER(3) NOT NULL,
@@ -239,6 +246,7 @@ CREATE TABLE catalogo_paises (
 );
 
 /*Faltan las reglas de negocio respectivas*/
+-- constraint total > 0
 CREATE TABLE factura_ventas_online (
     numeroventa      NUMBER(7) NOT NULL
         CONSTRAINT pk_factura_ventas_online PRIMARY KEY,
@@ -253,6 +261,7 @@ CREATE TABLE factura_ventas_online (
 );
 
 /*Faltan las reglas de negocio respectivas*/
+-- cantidad > 0
 CREATE TABLE detalle_factura_ventas_online (
     numeroventa    NUMBER(7) NOT NULL,
     id             NUMBER(2) NOT NULL,
@@ -274,6 +283,7 @@ CREATE TABLE detalle_factura_ventas_online (
 );
 
 /*Faltan las reglas de negocio*/
+-- total > 0
 CREATE TABLE factura_ventas_tienda (
     id_tienda       NUMBER(4) NOT NULL,
     numeroventa     NUMBER(7) NOT NULL,
@@ -289,6 +299,7 @@ CREATE TABLE factura_ventas_tienda (
 );
 
 /*Faltan las reglas de negocio*/
+-- cantidad > 0
 CREATE TABLE detalle_factura_ventas_tienda (
     id_tienda_fac  NUMBER(4) NOT NULL,
     numeroventa    NUMBER(7) NOT NULL,
@@ -317,6 +328,8 @@ CREATE TABLE detalle_factura_ventas_tienda (
                                                               id )
 );
 
+-- Costo del tour no puede ser negativo ni 0
+-- Cupos disponibles no pueden ser menores a 0
 CREATE TABLE tours (
     fecha         DATE
         CONSTRAINT pk_tours PRIMARY KEY,

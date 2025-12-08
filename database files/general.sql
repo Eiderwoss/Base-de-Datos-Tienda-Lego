@@ -34,7 +34,6 @@ END;
 --------------------------
 
 --5. Trigger de control de precios
--- No usar eventos cómo new u old en consultas.
 CREATE OR REPLACE TRIGGER trg_control_precios
 BEFORE INSERT ON Historico_Precios
 FOR EACH ROW

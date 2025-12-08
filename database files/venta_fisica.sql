@@ -359,10 +359,11 @@ CREATE OR REPLACE TRIGGER trg_validar_horario
 BEFORE INSERT ON factura_ventas_tienda
 FOR EACH ROW
 DECLARE
-    dia_semana      NUMBER;
+    dia_semana      NUMBER(1);
     fecha_venta_norm DATE; 
     apertura        DATE;
     cierre          DATE;
+    tienda          NUMBER(4) := :NEW.id_tienda;
 BEGIN
     dia_semana := TO_NUMBER(TO_CHAR(:NEW.fecha_venta, 'D'));
     fecha_venta_norm := TO_DATE('01/01/2000', 'DD/MM/YYYY') + (:NEW.fecha_venta - TRUNC(:NEW.fecha_venta));
@@ -370,7 +371,7 @@ BEGIN
         SELECT hora_inicio, hora_fin
         INTO apertura, cierre
         FROM horarios
-        WHERE id_tienda = :NEW.id_tienda AND
+        WHERE id_tienda = AND
         numerodia = dia_semana;
 
         IF fecha_venta_norm < apertura OR fecha_venta_norm > cierre THEN

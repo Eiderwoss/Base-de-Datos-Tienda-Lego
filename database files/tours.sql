@@ -223,23 +223,24 @@ END;
 -- 1. Trigger para validar edad del participante
 -- Especificar para qué actividad estamos validando la edad
 -- No usar eventos cómo new u old en consultas.
-CREATE OR REPLACE TRIGGER validar_edad
+CREATE OR REPLACE TRIGGER trg_validar_edad_detalle_inscripcion
 BEFORE INSERT OR UPDATE ON detalle_inscripciones
 FOR EACH ROW
 
 DECLARE
     V_FECHA_NAC DATE;
     V_REPRESENTANTE NUMBER(6);
-    V_EDAD NUMBER;
+    V_EDAD NUMBER (2);
     V_FECHA_TOUR DATE := :NEW.FECHA_TOUR_INS;
-    
+    V_ID_LEGO_CLI NUMBER (6) := :NEW.ID_LEGO_CLI;
+    V_ID_LEGO_FAN NUMBER (6) := :NEW.ID_LEGO_FAN;
 BEGIN
     -- Validacion para clientes (id_lego_cli)
     IF :NEW.ID_LEGO_CLI IS NOT NULL THEN
         
         SELECT c.fecha_nacimiento INTO V_FECHA_NAC
         FROM clientes c
-        WHERE c.id_lego = :NEW.ID_LEGO_CLI;
+        WHERE c.id_lego = V_ID_LEGO_CLI;
         
         V_EDAD := fn_calcular_edad(v_fecha_nac);
         
@@ -252,7 +253,7 @@ BEGIN
         
         SELECT f.fecha_nacimiento, f.id_lego_cliente INTO V_FECHA_NAC, V_REPRESENTANTE
         FROM fan_lego_menores f
-        WHERE f.id_lego = :NEW.ID_LEGO_FAN;
+        WHERE f.id_lego = V_ID_LEGO_FAN;
         
         V_EDAD := fn_calcular_edad(v_fecha_nac);
         
@@ -275,15 +276,14 @@ END;
 
 -- 6. Trigger validar menores
 -- Especificar en el nombre que son para las entradas
--- No usar eventos cómo new u old en consultas.
 CREATE OR REPLACE TRIGGER trg_validar_menores_entradas
 BEFORE INSERT ON Entradas
 FOR EACH ROW
 DECLARE
     v_fecha DATE;
-    v_num   NUMBER;
+    v_num   NUMBER (4);
     
-    v_cantidad_adultos NUMBER;
+    v_cantidad_adultos NUMBER (2);
 BEGIN
     v_fecha := :NEW.fecha_tour_ins;
     v_num   := :NEW.numeroinscripcion;
@@ -293,10 +293,10 @@ BEGIN
         SELECT COUNT(*)
         INTO v_cantidad_adultos
         FROM Entradas
-        WHERE fecha_tour_ins = v_fecha
-          AND numeroinscripcion = v_num
-          AND tipo = 'ADULTO';
-          
+        WHERE fecha_tour_ins = v_fecha AND 
+        numeroinscripcion = v_num AND 
+        tipo = 'ADULTO';
+
         IF v_cantidad_adultos = 0 THEN
             RAISE_APPLICATION_ERROR(-20005, 'ERROR: No se puede registrar un MENOR sin haber registrado primero un ADULTO responsable.');
         END IF;

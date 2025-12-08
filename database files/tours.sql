@@ -193,10 +193,10 @@ BEGIN
     -- 1. Buscamos el costo unitario del tour
     SELECT t.costo
     INTO v_costo_tour
-    FROM Inscripciones i
-    JOIN Tours t ON i.fecha_tour = t.fecha -- Ajustado a tu relación por fecha
-    WHERE i.fecha_tour = p_fecha_tour 
-      AND i.numeroinscripcion = p_num_insc;
+    FROM Tours t, Inscripciones i
+    WHERE t.fecha = i.fecha_tour
+    AND i.fecha_tour = p_fecha_tour
+    AND i.numeroinscripcion = p_num_insc;
 
     -- 2. Contamos cuántas personas hay en esa inscripción
     SELECT COUNT(*)

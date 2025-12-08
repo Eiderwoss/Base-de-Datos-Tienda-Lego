@@ -354,6 +354,7 @@ END sp_fisica_agregar_factura;
 ----------------------------
 -- TRIGGERS VENTA FÍSICA --
 ----------------------------
+/*No usar new u old en consultas*/
 CREATE OR REPLACE TRIGGER trg_validar_horario
 BEFORE INSERT ON factura_ventas_tienda
 FOR EACH ROW

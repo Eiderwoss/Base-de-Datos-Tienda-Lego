@@ -312,6 +312,7 @@ END;
 -- TRIGGERS VENTA ONLINE --
 -----------------------------
 
+/*Modificar este trigger porque la inserción de un nuevo valor de secuencia en un insert se hace al llamar al insert, no con trigger*/
 CREATE OR REPLACE TRIGGER trg_factura_online_autonum
 BEFORE INSERT ON Factura_Ventas_Online
 FOR EACH ROW

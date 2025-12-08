@@ -41,7 +41,7 @@ CREATE TABLE tiendas (
     id            NUMBER(4)
         CONSTRAINT pk_tiendas PRIMARY KEY,
     nombre        VARCHAR2(50) NOT NULL,
-    direccion     VARCHAR2(120) NOT NULL,
+    direccion     VARCHAR2(240) NOT NULL,
     id_pais_ciu   NUMBER(3) NOT NULL,
     id_estado_ciu NUMBER(5) NOT NULL,
     id_ciudad     NUMBER(5) NOT NULL,

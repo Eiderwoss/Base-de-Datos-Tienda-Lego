@@ -28,29 +28,29 @@ INSERT INTO Ciudades (id_pais_est, id_estado, id, nombre) VALUES (6, 61, 601, 'S
 INSERT INTO Ciudades (id_pais_est, id_estado, id, nombre) VALUES (7, 70, 700, 'NEWMARKET');
 
 -- 4. TIENDAS (Las 8 tiendas de tu lista)
-INSERT INTO Tiendas (id, nombre, web, id_pais_ciu, id_estado_ciu, id_ciudad) 
-VALUES (1001, 'LEGO Store Toulon', 'lego.com/toulon', 1, 10, 100);
+INSERT INTO Tiendas (id, nombre, direccion, id_pais_ciu, id_estado_ciu, id_ciudad) 
+VALUES (1001, 'LEGO Store Toulon', 'Centre Commercial Grand Var La Valette-du-Var, 83160, 83160 Toulon, Francia', 1, 10, 100);
 
-INSERT INTO Tiendas (id, nombre, web, id_pais_ciu, id_estado_ciu, id_ciudad) 
-VALUES (1002, 'LEGO Store Lisbon', 'lego.com/lisbon', 2, 20, 200);
+INSERT INTO Tiendas (id, nombre, direccion, id_pais_ciu, id_estado_ciu, id_ciudad) 
+VALUES (1002, 'LEGO Store Lisbon', 'Colombo Shopping Centre, Av. Lusíada Loja 0036/2/3, 1500-392 Lisboa, Portugal', 2, 20, 200);
 
-INSERT INTO Tiendas (id, nombre, web, id_pais_ciu, id_estado_ciu, id_ciudad) 
-VALUES (1003, 'LEGO Pavilion KL', 'lego.com/kl', 3, 30, 300);
+INSERT INTO Tiendas (id, nombre, direccion, id_pais_ciu, id_estado_ciu, id_ciudad) 
+VALUES (1003, 'LEGO Pavilion KL', 'Lot 6 . 102 . 00, 168, Bukit Bintang Rd, Bukit Bintang, 55100 Kuala Lumpur, Federal Territory of Kuala Lumpur, Malasia', 3, 30, 300);
 
-INSERT INTO Tiendas (id, nombre, web, id_pais_ciu, id_estado_ciu, id_ciudad) 
-VALUES (1004, 'LEGO River West', 'lego.com/athens', 4, 40, 400);
+INSERT INTO Tiendas (id, nombre, direccion, id_pais_ciu, id_estado_ciu, id_ciudad) 
+VALUES (1004, 'LEGO River West', 'Par. Leoforou Kifisou 98, Egaleo 122 41, Grecia', 4, 40, 400);
 
-INSERT INTO Tiendas (id, nombre, web, id_pais_ciu, id_estado_ciu, id_ciudad) 
-VALUES (1005, 'LEGO Store Arkad', 'lego.com/budapest', 5, 50, 500);
+INSERT INTO Tiendas (id, nombre, direccion, id_pais_ciu, id_estado_ciu, id_ciudad) 
+VALUES (1005, 'LEGO Store Arkad', 'Budapest, Örs vezér tere 25, 1148 Hungría', 5, 50, 500);
 
-INSERT INTO Tiendas (id, nombre, web, id_pais_ciu, id_estado_ciu, id_ciudad) 
-VALUES (1006, 'LEGO Barra Shopping', 'lego.com/barra', 6, 60, 600);
+INSERT INTO Tiendas (id, nombre, direccion, id_pais_ciu, id_estado_ciu, id_ciudad) 
+VALUES (1006, 'LEGO Barra Shopping', 'Av. das Américas, 4666 - Barra da Tijuca, Rio de Janeiro - RJ, 22640-102, Brasil', 6, 60, 600);
 
-INSERT INTO Tiendas (id, nombre, web, id_pais_ciu, id_estado_ciu, id_ciudad) 
-VALUES (1007, 'LEGO Analia Franco', 'lego.com/analia', 6, 61, 601);
+INSERT INTO Tiendas (id, nombre, direccion, id_pais_ciu, id_estado_ciu, id_ciudad) 
+VALUES (1007, 'LEGO Analia Franco', 'Av. Reg. Feijó, 1739 - Vila Reg. Feijó, São Paulo - SP, 03342-000, Brasil', 6, 61, 601);
 
-INSERT INTO Tiendas (id, nombre, web, id_pais_ciu, id_estado_ciu, id_ciudad) 
-VALUES (1008, 'LEGO Newmarket', 'lego.com/newmarket', 7, 70, 700);
+INSERT INTO Tiendas (id, nombre, direccion, id_pais_ciu, id_estado_ciu, id_ciudad) 
+VALUES (1008, 'LEGO Newmarket', 'Level 3, Shop S302, Westfield Newmarket 277 Broadway, Newmarket, Auckland 1023, Nueva Zelanda', 7, 70, 700);
 
 COMMIT;
 

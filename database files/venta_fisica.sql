@@ -15,20 +15,20 @@ NOCACHE;
 
 CREATE OR REPLACE TYPE juguetes_obj AS OBJECT (
     nombre varchar2(60),
-    cantidad number(2),
+    cantidad NUMBER(2),
     tipo_cliente varchar2(6)
 );
 
 CREATE OR REPLACE TYPE id_juguetes_obj AS OBJECT (
-    id number(4),
-    cantidad number(2),
+    id NUMBER(4),
+    cantidad NUMBER(2),
     tipo_cliente varchar2(6)
 );
 
 CREATE OR REPLACE TYPE lotes_juguetes_cantidades AS OBJECT (
-    id number (4),
-    cantidad number(2),
-    num_lote number (8),
+    id NUMBER (4),
+    cantidad NUMBER(2),
+    num_lote NUMBER (8),
 )
 
 CREATE OR REPLACE TYPE lista_juguetes IS TABLE OF juguetes_obj;
@@ -39,8 +39,8 @@ CREATE OR REPLACE TYPE lista_para_detalle IS TABLE OF lotes_juguetes_cantidades;
 -- PROCEDIMIENTOS/FUNCIONES VENTA FÍSICA --
 ---------------------------------------------
 
-CREATE OR REPLACE FUNCTION fn_fisica_buscar_cliente (primer_nombre IN varchar2(10), primer_apellido IN varchar2(10), documento_identidad IN number(9))
-RETURN number(6) IS id_encontrado number(6);
+CREATE OR REPLACE FUNCTION fn_fisica_buscar_cliente (primer_nombre IN varchar2(10), primer_apellido IN varchar2(10), documento_identidad IN NUMBER(9))
+RETURN NUMBER(6) IS id_encontrado NUMBER(6);
 BEGIN
     IF documento_identidad IS NOT NULL THEN
         BEGIN
@@ -71,7 +71,7 @@ BEGIN
 END fn_fisica_buscar_cliente;
 
 CREATE OR REPLACE FUNCTION fn_fisica_buscar_juguete (nombre_juguete IN varchar2(60))
-RETURN number(4) IS id_juguete number(4);
+RETURN NUMBER(4) IS id_juguete NUMBER(4);
 BEGIN
     IF nombre_juguete IS NOT NULL THEN
         BEGIN
@@ -87,8 +87,8 @@ BEGIN
 END fn_fisica_buscar_juguete;
 
 CREATE OR REPLACE FUNCTION fn_fisica_buscar_tienda (nombre_tienda IN varchar2(50),nombre_ciudad IN varchar2(30),nombre_pais IN varchar2(30))
-RETURN number(4) IS
-    id_tienda number(4);
+RETURN NUMBER(4) IS
+    id_tienda NUMBER(4);
 BEGIN
     IF (nombre_tienda IS NOT NULL) AND (nombre_ciudad IS NULL) AND (nombre_pais IS NULL) THEN
         BEGIN
@@ -161,18 +161,18 @@ BEGIN
 
 END fn_fisica_buscar_tienda;
 
-CREATE OR REPLACE FUNCTION fn_fisica_seleccionar_stock (juguetes IN lista_id_juguetes, id_tienda IN number(4))
+CREATE OR REPLACE FUNCTION fn_fisica_seleccionar_stock (juguetes IN lista_id_juguetes, id_tienda IN NUMBER(4))
 RETURN lista_para_detalle IS
-CURSOR fila_lote (id_juguete_buscado number(4)) IS  SELECT i.num_lote, i.cantidad
+CURSOR fila_lote (id_juguete_buscado NUMBER(4)) IS  SELECT i.num_lote, i.cantidad
                                                     FROM inventario_lotes i 
                                                     WHERE i.id_tienda = id_tienda AND 
                                                     i.id_juguete = id_juguete_buscado AND
                                                     i.cantidad > 0
                                                     ORDER BY num_lote ASC;
     lote fila_lote%rowtype;
-    cantidad_pendiente number(3);
-    cantidad_tomar     number(3);
-    cantidad_hoy number(3);
+    cantidad_pendiente NUMBER(3);
+    cantidad_tomar     NUMBER(3);
+    cantidad_hoy NUMBER(3);
     fecha_hoy date;
     lista_respuesta lista_para_detalle := lista_para_detalle();
 BEGIN
@@ -284,14 +284,14 @@ END;
 */
 
 CREATE OR REPLACE PROCEDURE sp_fisica_agregar_factura (juguetes IN lista_juguetes, nombre_tienda IN varchar2(50), nombre_ciudad IN varchar2(30), 
-nombre_pais varchar2(30), primer_nombre_cliente IN varchar2(10), primer_apellido_cliente IN varchar2(10), documento_identidad IN number (9)) IS
+nombre_pais varchar2(30), primer_nombre_cliente IN varchar2(10), primer_apellido_cliente IN varchar2(10), documento_identidad IN NUMBER (9)) IS
     id_juguetes lista_id_juguetes := lista_id_juguetes();
-    id_temporal_juguete number(4);
-    id_tienda number(4);
-    id_cliente number(6);
-    cantidad_disponible number(4);
-    total number (6,2);
-    id_factura_actual number(7);
+    id_temporal_juguete NUMBER(4);
+    id_tienda NUMBER(4);
+    id_cliente NUMBER(6);
+    cantidad_disponible NUMBER(4);
+    total NUMBER (6,2);
+    id_factura_actual NUMBER(7);
     lista_lotes lista_para_detalle := lista_para_detalle ();
 BEGIN
     id_tienda := fn_fisica_buscar_tienda (nombre_tienda, nombre_ciudad, nombre_pais);

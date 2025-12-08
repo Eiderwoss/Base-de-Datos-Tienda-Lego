@@ -5,9 +5,9 @@
 CREATE OR REPLACE FUNCTION fn_cupos_disponibles (
     p_fecha_tour DATE
 ) RETURN NUMBER IS
-    v_cupos_totales  NUMBER;
-    v_ocupados       NUMBER;
-    v_disponibles    NUMBER;
+    v_cupos_totales  NUMBER(2);
+    v_ocupados       NUMBER(2);
+    v_disponibles    NUMBER(2);
 BEGIN
     -- 1. Obtener capacidad total del tour
     BEGIN
@@ -41,23 +41,23 @@ END;
 
 
 CREATE OR REPLACE PROCEDURE sp_realizar_inscripcion (
-    p_id_cliente_pagador IN NUMBER,       
+    p_id_cliente_pagador IN NUMBER(6),       
     p_fecha_tour         IN DATE,
     p_lista_acompanantes IN VARCHAR2 -- Puede ser NULL si va solo
 ) IS
     -- Variables de control
-    v_num_inscripcion   NUMBER;
-    v_cupos_disponibles NUMBER;
-    v_personas_total    NUMBER := 1; -- Empieza en 1 (el pagador)
-    v_nuevo_total       NUMBER;
-    v_next_id_detalle   NUMBER := 1;
+    v_num_inscripcion   NUMBER(4);
+    v_cupos_disponibles NUMBER(2);
+    v_personas_total    NUMBER(2) := 1; -- Empieza en 1 (el pagador)
+    v_nuevo_total       NUMBER(6, 2);
+    v_next_id_detalle   NUMBER(7) := 1;
 
     -- Variables para el Bucle (Parsing de texto)
     v_lista_trabajo     VARCHAR2(4000) := p_lista_acompanantes;
-    v_pos_coma          NUMBER;
-    v_pos_dos_puntos    NUMBER;
+    v_pos_coma          NUMBER(5);
+    v_pos_dos_puntos    NUMBER(5);
     v_bloque            VARCHAR2(100);
-    v_id_persona        NUMBER;
+    v_id_persona        NUMBER(6);
     v_tipo              VARCHAR2(20);
 
 BEGIN
@@ -184,11 +184,11 @@ END;
 --Calcular el total de la inscripcion
 CREATE OR REPLACE FUNCTION fn_calcular_total_inscripcion (
     p_fecha_tour DATE,
-    p_num_insc   NUMBER
+    p_num_insc   NUMBER(4)
 ) RETURN NUMBER IS
-    v_costo_tour NUMBER;
-    v_cantidad   NUMBER;
-    v_total      NUMBER;
+    v_costo_tour NUMBER(5, 2);
+    v_cantidad   NUMBER(2);
+    v_total      NUMBER(6, 2);
 BEGIN
     -- 1. Buscamos el costo unitario del tour
     SELECT t.costo

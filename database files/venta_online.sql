@@ -29,11 +29,11 @@ FROM
 
 -- Calcular saldo total dinamicamente (Suma desde la ultima factura GRATIS = 'SI')
 CREATE OR REPLACE FUNCTION fn_obtener_saldo_puntos (
-    p_id_cliente IN NUMBER
+    p_id_cliente IN NUMBER(6)
 )
 RETURN NUMBER IS
-    v_saldo_acumulado NUMBER := 0;
-    v_ultima_venta_gratis NUMBER;
+    v_saldo_acumulado NUMBER(3) := 0;
+    v_ultima_venta_gratis NUMBER(5);
 BEGIN
     BEGIN
         SELECT MAX(numeroventa)
@@ -68,10 +68,10 @@ END;
 
 -- Validar canjeo de puntos
 CREATE OR REPLACE PROCEDURE sp_validar_canje_puntos (
-    p_id_cliente IN NUMBER,
-    p_puntos_usar IN NUMBER
+    p_id_cliente IN NUMBER(6),
+    p_puntos_usar IN NUMBER(3)
 ) IS
-    v_saldo_actual NUMBER;
+    v_saldo_actual NUMBER(3);
 BEGIN
     -- Calcular el saldo actual de forma dinamica
     v_saldo_actual := fn_obtener_saldo_puntos(p_id_cliente);
@@ -91,13 +91,13 @@ END;
 
 -- Canjeo de puntos
 CREATE OR REPLACE PROCEDURE sp_canjear_puntos (
-    p_id_cliente IN NUMBER,
-    p_id_juguete_canje IN NUMBER,
-    p_puntos_requeridos IN NUMBER
+    p_id_cliente IN NUMBER(6),
+    p_id_juguete_canje IN NUMBER(4),
+    p_puntos_requeridos IN NUMBER(3)
 )
 IS
-    v_num_venta NUMBER;
-    v_pais_res NUMBER;
+    v_num_venta NUMBER(7);
+    v_pais_res NUMBER(3);
     v_es_ue CHAR(2);
     
     e_saldo_insuficiente EXCEPTION;
@@ -169,9 +169,9 @@ END;
 /
 
 -- Funcion de otorgar puntos
-CREATE OR REPLACE FUNCTION fn_calcular_puntos (p_monto_total NUMBER) 
+CREATE OR REPLACE FUNCTION fn_calcular_puntos (p_monto_total NUMBER(6, 2)) 
 RETURN NUMBER IS
-    v_puntos NUMBER := 0;
+    v_puntos NUMBER(3) := 0;
 BEGIN
     -- Rango A: Menos de 10
     IF p_monto_total < 10 THEN
@@ -195,27 +195,27 @@ END;
 /
 
 CREATE OR REPLACE PROCEDURE sp_venta_online_txt (
-    p_id_cliente      IN NUMBER,
+    p_id_cliente      IN NUMBER(6),
     p_lista_productos IN VARCHAR2 -- Ejemplo: '201:1, 101:2'
 ) IS
     -- Variables de Cabecera
-    v_num_venta      NUMBER;
-    v_pais_res       NUMBER;
+    v_num_venta      NUMBER(7);
+    v_pais_res       NUMBER(3);
     v_es_ue          CHAR(2); 
-    v_total_bruto    NUMBER := 0;
-    v_recargo        NUMBER := 0;
-    v_total_neto     NUMBER := 0;
-    v_puntos         NUMBER := 0;
+    v_total_bruto    NUMBER(6,2) := 0;
+    v_recargo        NUMBER(6,2) := 0;
+    v_total_neto     NUMBER(6,2) := 0;
+    v_puntos         NUMBER(3) := 0;
 
     -- Variables para Parsing (Corte de cadena)
     v_lista_trabajo  VARCHAR2(4000) := p_lista_productos;
-    v_pos_coma       NUMBER;
-    v_pos_dos_puntos NUMBER;
+    v_pos_coma       NUMBER(5);
+    v_pos_dos_puntos NUMBER(5);
     v_bloque         VARCHAR2(100);
-    v_prod_id        NUMBER;
-    v_prod_cant      NUMBER;
-    v_precio_unit    NUMBER;
-    v_next_id_det    NUMBER := 1; -- ID autoincremental para el detalle
+    v_prod_id        NUMBER(4);
+    v_prod_cant      NUMBER(4);
+    v_precio_unit    NUMBER(5,2);
+    v_next_id_det    NUMBER(2) := 1; -- ID autoincremental para el detalle
 
 BEGIN
     -- 1. Obtener Datos del Cliente (País y si pertenece a la UE para el impuesto)
@@ -315,15 +315,14 @@ CREATE OR REPLACE TRIGGER trg_validar_detalle_online
 BEFORE INSERT ON Detalle_Factura_Ventas_Online
 FOR EACH ROW
 DECLARE
-    v_num_venta     NUMBER;
-    v_id_pais_cat   NUMBER;
-    v_id_juguete    NUMBER;
-    v_cantidad      NUMBER;
+    v_num_venta     NUMBER(7);
+    v_id_pais_cat   NUMBER(3);
+    v_id_juguete    NUMBER(4);
+    v_cantidad      NUMBER(2);
 
-    v_id_cliente    NUMBER;
-    v_pais_res      NUMBER;
-    v_limite_pais   NUMBER;
-    v_existe_cat    NUMBER;
+    v_id_cliente    NUMBER(6);
+    v_pais_res      NUMBER(3);
+    v_limite_pais   NUMBER(2);
 BEGIN
     v_num_venta   := :NEW.numeroventa;
     v_id_pais_cat := :NEW.id_pais_cat;

@@ -225,6 +225,64 @@ EXCEPTION
 END fn_fisica_seleccionar_stock;
 /
 
+CREATE OR REPLACE PROCEDURE sp_batch_cierre_inventario IS
+CURSOR resumen_diario IS
+    SELECT  d.id_tienda_inv, 
+            d.id_juguete_inv, 
+            d.num_lote, 
+            SUM(d.cantidad) as total_a_descontar
+    FROM descuento_lotes d
+    WHERE TRUNC(d.fecha) = TRUNC(SYSDATE)
+    GROUP BY d.id_tienda_inv, d.id_juguete_inv, d.num_lote;
+    
+total_procesado NUMBER (5) := 0;
+BEGIN
+    FOR r IN resumen_diario LOOP
+        
+        UPDATE inventario_lotes i
+        SET i.cantidad = i.cantidad - r.total_a_descontar
+        WHERE i.id_tienda = r.id_tienda_inv AND 
+        i.id_juguete = r.id_juguete_inv 
+        AND i.num_lote = r.num_lote;
+
+        total_procesado := total_procesado + 1;
+        
+    END LOOP;
+
+    COMMIT;
+    
+    DBMS_OUTPUT.PUT_LINE('Cierre diario completado. Lotes actualizados: ' || total_procesado);
+
+EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        DBMS_OUTPUT.PUT_LINE('Error crítico en cierre diario: ' || SQLERRM);
+END sp_batch_cierre_inventario;
+/
+
+BEGIN
+    DBMS_SCHEDULER.CREATE_JOB (
+        job_name        => 'JOB_CIERRE_INVENTARIO_DIARIO',
+        job_type        => 'PLSQL_BLOCK',
+        job_action      => 'BEGIN sp_batch_cierre_inventario; END;',
+        start_date      => SYSTIMESTAMP,
+        repeat_interval => 'FREQ=DAILY; BYHOUR=22; BYMINUTE=00; BYSECOND=00',
+        enabled         => TRUE
+    );
+END;
+/
+
+/*Si quiero modificar el job:
+
+BEGIN
+    DBMS_SCHEDULER.SET_ATTRIBUTE (
+        name      => 'JOB_CIERRE_INVENTARIO_DIARIO',
+        attribute => 'repeat_interval',
+        value     => 'FREQ=DAILY; BYHOUR=02; BYMINUTE=00; BYSECOND=00'
+    );
+END;
+*/
+
 CREATE OR REPLACE PROCEDURE sp_fisica_agregar_factura (juguetes IN lista_juguetes, nombre_tienda IN varchar2(50), nombre_ciudad IN varchar2(30), 
 nombre_pais varchar2(30), primer_nombre_cliente IN varchar2(10), primer_apellido_cliente IN varchar2(10), documento_identidad IN number (9)) IS
     id_juguetes lista_id_juguetes := lista_id_juguetes();

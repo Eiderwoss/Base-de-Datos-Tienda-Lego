@@ -72,8 +72,6 @@ CREATE TABLE telefonos (
 );
 
 /*El formateo de las horas en un trigger? Si, al hacer un insert se formatea*/
-/*Faltan reglas de negocio respecto a numerodia en triggers*/
--- CHECK hora_fin siempre es > a hora_inicio
 CREATE TABLE horarios (
     id_tienda   NUMBER(4) NOT NULL,
     numerodia   NUMBER(1) NOT NULL,
@@ -82,12 +80,12 @@ CREATE TABLE horarios (
     CONSTRAINT fk_horarios_tiendas FOREIGN KEY ( id_tienda )
         REFERENCES tiendas ( id ),
     CONSTRAINT pk_horarios PRIMARY KEY ( id_tienda,
-                                         numerodia )
+                                         numerodia ),
+    CONSTRAINT ck_hora_fin CHECK (hora_fin > hora_inicio)
 );
 
 /*Falta Regla de negocio de >= 21*/
 /*Faltan el resto de reglas de negocio con triggers/programas*/
-/*¿El pasaporte es tipo varchar2? ¿Cuántos caracteres debería tomar?*/
 CREATE TABLE clientes (
     id_lego                     NUMBER(6)
         CONSTRAINT pk_clientes PRIMARY KEY,
@@ -108,8 +106,6 @@ CREATE TABLE clientes (
         REFERENCES paises ( id )
 );
 
-/*Faltan los constrains de FK*/
-/*Regla de negocio de fans entre 12-20 y que si son mayores a 18 no tienen representante*/
 /*Faltan el resto de reglas de negocio con triggers/programas*/
 CREATE TABLE fan_lego_menores (
     id_lego                     NUMBER(6)
@@ -142,7 +138,6 @@ CREATE TABLE temas (
     CONSTRAINT ck_tipo CHECK ( tipo IN ( 'SERIE', 'TEMA' ) )
 );
 
--- Instrucciones UQ
 CREATE TABLE juguetes (
     id            NUMBER(4)
         CONSTRAINT pk_juguetes PRIMARY KEY,
@@ -153,7 +148,7 @@ CREATE TABLE juguetes (
     set_lego      VARCHAR2(2) NOT NULL,
     id_tema       NUMBER(2) NOT NULL,
     numero_piezas NUMBER(4),
-    instrucciones NUMBER(7),
+    instrucciones NUMBER(7) UNIQUE,
     id_juguete    NUMBER(4),
     CONSTRAINT fk_juguete_padre FOREIGN KEY ( id_juguete )
         REFERENCES juguetes ( id ),
@@ -168,8 +163,6 @@ CREATE TABLE juguetes (
 );
 
 /*Faltan los triggers/programas de las reglas de negocio*/
--- CONSTRAINT PRECIO NO PUEDE SER 0 ni negativo
--- constraint fecha fin > a fecha inicio
 CREATE TABLE historico_precios (
     id_juguete   NUMBER(4) NOT NULL,
     fecha_inicio DATE NOT NULL,
@@ -178,10 +171,11 @@ CREATE TABLE historico_precios (
     CONSTRAINT fk_historico_juguetes FOREIGN KEY ( id_juguete )
         REFERENCES juguetes ( id ),
     CONSTRAINT pk_historico_precios PRIMARY KEY ( id_juguete,
-                                                  fecha_inicio )
+                                                  fecha_inicio ),
+    CONSTRAINT ck_precio_historico_precio CHECK (precio > 0),
+    CONSTRAINT ck_fecha_fin_historico_precio CHECK (fecha_fin > fecha_inicio)
 );
 
-/*Buscar mejores nombre para los ID y los constraints FK*/
 CREATE TABLE prod_relaciones (
     id_juguete_1 NUMBER(4) NOT NULL,
     id_juguete_2 NUMBER(4) NOT NULL,
@@ -194,7 +188,6 @@ CREATE TABLE prod_relaciones (
 );
 
 /*Aplicarle el trigger para descontarle la cantidad al lote según el descuento_lotes*/
--- Cantidad no puede ser negativa CONSTRAINT
 CREATE TABLE inventario_lotes (
     id_juguete NUMBER(4) NOT NULL,
     id_tienda  NUMBER(4) NOT NULL,
@@ -206,11 +199,11 @@ CREATE TABLE inventario_lotes (
         REFERENCES tiendas ( id ),
     CONSTRAINT pk_inventario_lotes PRIMARY KEY ( id_juguete,
                                                  id_tienda,
-                                                 num_lote )
+                                                 num_lote ),
+    CONSTRAINT ck_cantidad_inventario_lotes CHECK (cantidad >= 0)
 );
 
 /*Faltan las reglas de negocio respectivas*/
--- Cantidad no puede ser negativa CONSTRAINT
 CREATE TABLE descuento_lotes (
     id_juguete_inv NUMBER(4) NOT NULL,
     id_tienda_inv  NUMBER(4) NOT NULL,
@@ -229,10 +222,10 @@ CREATE TABLE descuento_lotes (
         PRIMARY KEY ( id_juguete_inv,
                       id_tienda_inv,
                       num_lote,
-                      id )
+                      id ),
+    CONSTRAINT ck_cantidad_descuento_lotes CHECK (cantidad > 0)
 );
 
--- constraints limite > 0
 CREATE TABLE catalogo_paises (
     id_juguete NUMBER(4) NOT NULL,
     id_pais    NUMBER(3) NOT NULL,
@@ -242,11 +235,11 @@ CREATE TABLE catalogo_paises (
     CONSTRAINT fk_catalogo_juguetes FOREIGN KEY ( id_juguete )
         REFERENCES juguetes ( id ),
     CONSTRAINT pk_catalogo_paises PRIMARY KEY ( id_juguete,
-                                                id_pais )
+                                                id_pais ),
+    CONSTRAINT ck_limite_catalogo_paises CHECK (limite > 0)
 );
 
 /*Faltan las reglas de negocio respectivas*/
--- constraint total > 0
 CREATE TABLE factura_ventas_online (
     numeroventa      NUMBER(7) NOT NULL
         CONSTRAINT pk_factura_ventas_online PRIMARY KEY,
@@ -257,11 +250,11 @@ CREATE TABLE factura_ventas_online (
     puntos_generados NUMBER(3),
     CONSTRAINT ck_gratis CHECK ( gratis IN ( 'SI', 'NO' ) ),
     CONSTRAINT fk_factura_online_clientes FOREIGN KEY ( id_lego_cliente )
-        REFERENCES clientes ( id_lego )
+        REFERENCES clientes ( id_lego ),
+    CONSTRAINT ck_total_factura_ventas_online (total >= 0)
 );
 
 /*Faltan las reglas de negocio respectivas*/
--- cantidad > 0
 CREATE TABLE detalle_factura_ventas_online (
     numeroventa    NUMBER(7) NOT NULL,
     id             NUMBER(2) NOT NULL,
@@ -279,7 +272,8 @@ CREATE TABLE detalle_factura_ventas_online (
             REFERENCES catalogo_paises ( id_juguete,
                                          id_pais ),
     CONSTRAINT pk_detalle_factura_ventas_online PRIMARY KEY ( numeroventa,
-                                                              id )
+                                                              id ),
+    CONSTRAINT ck_cantidad_detalle_ventas_online CHECK (cantidad > 0)
 );
 
 /*Faltan las reglas de negocio*/
@@ -295,7 +289,8 @@ CREATE TABLE factura_ventas_tienda (
     CONSTRAINT fk_factura_tienda_clientes FOREIGN KEY ( id_lego_cliente )
         REFERENCES clientes ( id_lego ),
     CONSTRAINT pk_factura_ventas_tiendas PRIMARY KEY ( id_tienda,
-                                                       numeroventa )
+                                                       numeroventa ),
+    CONSTRAINT ck_total_factura_ventas_tienda (total > 0)
 );
 
 /*Faltan las reglas de negocio*/
@@ -325,7 +320,8 @@ CREATE TABLE detalle_factura_ventas_tienda (
                                           num_lote ),
     CONSTRAINT pk_detalle_factura_ventas_tienda PRIMARY KEY ( id_tienda_fac,
                                                               numeroventa,
-                                                              id )
+                                                              id ),
+    CONSTRAINT ck_cantidad_detalle_ventas_tienda CHECK (cantidad > 0)
 );
 
 -- Costo del tour no puede ser negativo ni 0
@@ -334,7 +330,9 @@ CREATE TABLE tours (
     fecha         DATE
         CONSTRAINT pk_tours PRIMARY KEY,
     cupos_totales NUMBER(2) NOT NULL,
-    costo         NUMBER(5, 2) NOT NULL
+    costo         NUMBER(5, 2) NOT NULL,
+    CONSTRAINT ck_costo_tours CHECK (tour > 0),
+    CONSTRAINT ck_cupos_totales_tours CHECK (cupos_totales > 0)
 );
 
 /*Faltan las reglas de negocio respectivas*/

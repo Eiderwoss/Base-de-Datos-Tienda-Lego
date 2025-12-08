@@ -45,8 +45,40 @@ BEGIN
 
     UPDATE Historico_Precios
     SET fecha_fin = SYSDATE
-    WHERE id_juguete = v_id_juguete
-      AND fecha_fin IS NULL;
+    WHERE id_juguete = v_id_juguete AND
+    fecha_fin IS NULL;
+END;
+/
 
+CREATE OR REPLACE TRIGGER trg_validar_edad_cliente
+BEFORE INSERT OR UPDATE ON clientes
+FOR EACH ROW
+DECLARE
+    edad NUMBER;
+BEGIN
+    edad := fn_calcular_edad(:NEW.fecha_nacimiento);
+
+    IF edad <= 20 THEN
+        RAISE_APPLICATION_ERROR(-20020, 'Error: El cliente debe ser mayor de 20 años. Edad actual: ' || edad);
+    END IF;
+END;
+/
+
+CREATE OR REPLACE TRIGGER trg_validar_lego_menores
+BEFORE INSERT OR UPDATE ON fan_lego_menores
+FOR EACH ROW
+DECLARE
+    edad NUMBER;
+BEGIN
+    edad := fn_calcular_edad(:NEW.fecha_nacimiento);
+    IF (edad < 12) OR (edad > 20) THEN
+        RAISE_APPLICATION_ERROR(-20030, 'Error: El fan debe tener entre 12 y 20 años. Edad actual: ' || edad);
+    END IF;
+    IF (edad < 18) AND (:NEW.id_lego_cliente IS NULL)THEN
+        RAISE_APPLICATION_ERROR(-20040, 'Error: El fan debe tener un representante obligatoriamente.');
+    END IF;
+    IF (edad >= 18) AND (:NEW.id_lego_cliente IS NOT NULL)THEN
+        RAISE_APPLICATION_ERROR(-20040, 'Error: El fan es mayor de edad, no debe tener un representante.');
+    END IF;
 END;
 /

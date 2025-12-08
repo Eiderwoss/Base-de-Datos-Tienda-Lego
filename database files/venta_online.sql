@@ -125,7 +125,7 @@ BEGIN
         total, 
         puntos_generados
     ) VALUES (
-        NULL, 
+        seq_factura_online.NEXTVAL, 
         SYSDATE, 
         'SI',              
         p_id_cliente, 
@@ -227,7 +227,7 @@ BEGIN
 
     -- 2. Crear Factura Inicial (Total 0 por ahora)
     INSERT INTO Factura_Ventas_Online (numeroventa, fecha_venta, gratis, id_lego_cliente, total, puntos_generados)
-        VALUES (NULL, SYSDATE, 'NO', p_id_cliente, 0, 0)
+        VALUES (seq_factura_online.NEXTVAL, SYSDATE, 'NO', p_id_cliente, 0, 0)
         RETURNING numeroventa INTO v_num_venta;
 
     -- 3. PROCESAMIENTO DE LA LISTA DE PRODUCTOS
@@ -254,7 +254,7 @@ BEGIN
                     WHERE id_juguete = v_prod_id AND fecha_fin IS NULL;
                 EXCEPTION
                     WHEN NO_DATA_FOUND THEN
-                         RAISE_APPLICATION_ERROR(-20060, 'El juguete '||v_prod_id||' no tiene precio activo.');
+                        RAISE_APPLICATION_ERROR(-20060, 'El juguete '||v_prod_id||' no tiene precio activo.');
                 END;
 
                 -- B. Acumular Total Bruto
@@ -311,15 +311,6 @@ END;
 -- TRIGGERS VENTA ONLINE --
 -----------------------------
 
-/*Modificar este trigger porque la inserción de un nuevo valor de secuencia en un insert se hace al llamar al insert, no con trigger*/
-CREATE OR REPLACE TRIGGER trg_factura_online_autonum
-BEFORE INSERT ON Factura_Ventas_Online
-FOR EACH ROW
-BEGIN
-    :NEW.numeroventa := seq_factura_online.NEXTVAL;
-END;
-/
-
 CREATE OR REPLACE TRIGGER trg_validar_detalle_online
 BEFORE INSERT ON Detalle_Factura_Ventas_Online
 FOR EACH ROW
@@ -363,9 +354,9 @@ BEGIN
         SELECT limite 
         INTO v_limite_pais
         FROM Catalogo_Paises
-        WHERE id_juguete = v_id_juguete 
-          AND id_pais = v_id_pais_cat;
-          
+        WHERE id_juguete = v_id_juguete AND 
+        id_pais = v_id_pais_cat;
+
         -- Si cantidad supera límite
         IF v_cantidad > v_limite_pais THEN
             RAISE_APPLICATION_ERROR(-20051, 'Error: La cantidad ('|| v_cantidad ||') excede el límite permitido ('|| v_limite_pais ||') para este producto en este país.');

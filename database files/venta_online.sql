@@ -8,20 +8,6 @@ INCREMENT BY 1
 NOCACHE;
 /
 
--------------------------
--- VISTAS VENTA ONLINE --
--------------------------
-
-CREATE OR REPLACE VIEW v_saldo_puntos_cliente AS
-SELECT
-    c.id_lego AS ID_CLIENTE,
-    c.primer_nombre AS PRIMER_NOMBRE,
-    c.primer_apellido AS PRIMER_APELLIDO,
-    fn_obtener_saldo_puntos(c.id_lego) AS PUNTOS_DISPONIBLES
-FROM
-    Clientes c;
-
-/
 
 ---------------------------------------------
 -- PROCEDIMIENTOS/FUNCIONES VENTA ONLINE --
@@ -382,6 +368,17 @@ BEGIN
 END;
 /
 
+-------------------------
+-- VISTAS VENTA ONLINE --
+-------------------------
 
+CREATE OR REPLACE VIEW v_saldo_puntos_cliente AS
+SELECT
+    c.id_lego AS ID_CLIENTE,
+    c.primer_nombre AS PRIMER_NOMBRE,
+    c.primer_apellido AS PRIMER_APELLIDO,
+    fn_obtener_saldo_puntos(c.id_lego) AS PUNTOS_DISPONIBLES
+FROM
+    Clientes c;
 
-
+/

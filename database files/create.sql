@@ -206,7 +206,7 @@ CREATE TABLE inventario_lotes (
 CREATE TABLE descuento_lotes (
     id_juguete_inv NUMBER(4) NOT NULL,
     id_tienda_inv  NUMBER(4) NOT NULL,
-    num_lote       NUMBER(8) NOT NULL,
+    num_lote       NUMBER(6) NOT NULL,
     id             NUMBER(4) NOT NULL,
     fecha          DATE NOT NULL,
     cantidad       NUMBER(4, 2) NOT NULL,
@@ -250,7 +250,7 @@ CREATE TABLE factura_ventas_online (
     CONSTRAINT ck_gratis CHECK ( gratis IN ( 'SI', 'NO' ) ),
     CONSTRAINT fk_factura_online_clientes FOREIGN KEY ( id_lego_cliente )
         REFERENCES clientes ( id_lego ),
-    CONSTRAINT ck_total_factura_ventas_online (total >= 0)
+    CONSTRAINT ck_total_factura_ventas_online CHECK (total >= 0)
 );
 
 /*Faltan las reglas de negocio respectivas*/
@@ -288,7 +288,7 @@ CREATE TABLE factura_ventas_tienda (
         REFERENCES clientes ( id_lego ),
     CONSTRAINT pk_factura_ventas_tiendas PRIMARY KEY ( id_tienda,
                                                        numeroventa ),
-    CONSTRAINT ck_total_factura_ventas_tienda (total > 0)
+    CONSTRAINT ck_total_factura_ventas_tienda CHECK (total > 0)
 );
 
 /*Faltan las reglas de negocio*/
@@ -326,7 +326,7 @@ CREATE TABLE tours (
         CONSTRAINT pk_tours PRIMARY KEY,
     cupos_totales NUMBER(2) NOT NULL,
     costo         NUMBER(5, 2) NOT NULL,
-    CONSTRAINT ck_costo_tours CHECK (tour > 0),
+    CONSTRAINT ck_costo_tours CHECK (costo > 0),
     CONSTRAINT ck_cupos_totales_tours CHECK (cupos_totales > 0)
 );
 

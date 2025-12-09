@@ -87,7 +87,7 @@ INSERT INTO Fan_Lego_Menores (
     id_pais, segundo_nombre, documento_identidad, numero_pasaporte, 
     fecha_vencimiento_pasaporte, id_lego_cliente
 ) VALUES (
-    10, 'CARLITOS', 'PEREZ', 'GOMEZ', TO_DATE('01/06/2015','DD/MM/YYYY'), 
+    10, 'CARLITOS', 'PEREZ', 'GOMEZ', TO_DATE('01/06/2008','DD/MM/YYYY'), 
     6, NULL, 10001, 'P111222', 
     TO_DATE('01/01/2030','DD/MM/YYYY'), 99
 );
@@ -98,7 +98,7 @@ INSERT INTO Fan_Lego_Menores (
     id_pais, segundo_nombre, documento_identidad, numero_pasaporte, 
     fecha_vencimiento_pasaporte, id_lego_cliente
 ) VALUES (
-    11, 'ANA', 'COSTA', 'SILVA', TO_DATE('15/03/2016','DD/MM/YYYY'), 
+    11, 'ANA', 'COSTA', 'SILVA', TO_DATE('15/03/2013','DD/MM/YYYY'), 
     2, 'LUCIA', 20002, 'P333444', 
     TO_DATE('01/01/2031','DD/MM/YYYY'), 88
 );
@@ -169,7 +169,7 @@ VALUES (304, 'KNUCKLES GUARDIAN MECH', 'Robot mecánico de combate para proteger
 
 /* TEMA 4: SUPER MARIO (ID TEMA = 4) */
 INSERT INTO Juguetes (id, nombre, descripcion, rango_edad, rango_precio, set_lego, id_tema, numero_piezas, instrucciones, id_juguete)
-VALUES (401, 'MARIO & STANDARD KART', 'Vehículo de Mario Kart listo para correr en pistas de ladrillos.', '7 A 8', 'B', 'SI', 4, 150, 400401, NULL);
+VALUES (401, 'MARIO'|| '&' ||'STANDARD KART', 'Vehículo de Mario Kart listo para correr en pistas de ladrillos.', '7 A 8', 'B', 'SI', 4, 150, 400401, NULL);
 
 INSERT INTO Juguetes (id, nombre, descripcion, rango_edad, rango_precio, set_lego, id_tema, numero_piezas, instrucciones, id_juguete)
 VALUES (402, 'THE MIGHTY BOWSER', 'Figura gigante articulada del Rey de los Koopas con lanzador de fuego.', 'ADULTOS', 'D', 'SI', 4, 2807, 400402, NULL);
@@ -302,15 +302,33 @@ VALUES (104, 1008, 100801, 12);
 COMMIT;
 
 /* -------------------------------------------------------------------------
+   22. TABLA HORARIOS
+   (Asumimos numerodia: 1=Lunes ... 7=Domingo)
+   ------------------------------------------------------------------------- */
+
+-- Horario Tienda Francia (1001) - Lunes a Domingo de 10am a 8pm
+INSERT INTO Horarios (id_tienda, numerodia, hora_inicio, hora_fin) VALUES (1001, 2, TO_DATE('01/01/2000 10:00','DD/MM/YYYY HH24:MI'), TO_DATE('20:00','HH24:MI'));
+INSERT INTO Horarios (id_tienda, numerodia, hora_inicio, hora_fin) VALUES (1001, 3, TO_DATE('01/01/2000 10:00','DD/MM/YYYY HH24:MI'), TO_DATE('20:00','HH24:MI'));
+INSERT INTO Horarios (id_tienda, numerodia, hora_inicio, hora_fin) VALUES (1001, 4, TO_DATE('01/01/2000 10:00','DD/MM/YYYY HH24:MI'), TO_DATE('20:00','HH24:MI'));
+INSERT INTO Horarios (id_tienda, numerodia, hora_inicio, hora_fin) VALUES (1001, 5, TO_DATE('01/01/2000 10:00','DD/MM/YYYY HH24:MI'), TO_DATE('20:00','HH24:MI'));
+INSERT INTO Horarios (id_tienda, numerodia, hora_inicio, hora_fin) VALUES (1001, 6, TO_DATE('01/01/2000 10:00','DD/MM/YYYY HH24:MI'), TO_DATE('21:00','HH24:MI')); -- Viernes cierra tarde
+INSERT INTO Horarios (id_tienda, numerodia, hora_inicio, hora_fin) VALUES (1001, 7, TO_DATE('01/01/2000 09:00','DD/MM/YYYY HH24:MI'), TO_DATE('21:00','HH24:MI')); -- Sabado abre temprano
+INSERT INTO Horarios (id_tienda, numerodia, hora_inicio, hora_fin) VALUES (1001, 1, TO_DATE('01/01/2000 11:00','DD/MM/YYYY HH24:MI'), TO_DATE('18:00','HH24:MI')); -- Domingo reducido
+
+-- Horario Tienda Brasil Rio (1006) - Lunes a Viernes
+INSERT INTO Horarios (id_tienda, numerodia, hora_inicio, hora_fin) VALUES (1006, 2, TO_DATE('01/01/2000 09:00','DD/MM/YYYY HH24:MI'), TO_DATE('22:00','HH24:MI')); -- Mall hours
+INSERT INTO Horarios (id_tienda, numerodia, hora_inicio, hora_fin) VALUES (1006, 3, TO_DATE('01/01/2000 09:00','DD/MM/YYYY HH24:MI'), TO_DATE('22:00','HH24:MI'));
+
+/* -------------------------------------------------------------------------
    13. FACTURA_VENTAS_TIENDA
    ------------------------------------------------------------------------- */
 -- Venta 1: Maria (88) compra en la tienda de Francia (1001)
 INSERT INTO Factura_Ventas_Tienda (id_tienda, numeroventa, fecha_venta, id_lego_cliente, total)
-VALUES (1001, 10001, TO_DATE('15/12/2025','DD/MM/YYYY'), 88, 19.99);
+VALUES (1001, 10001, TO_DATE('15/12/2025 14:00','DD/MM/YYYY HH24:MI'), 88, 19.99);
 
 -- Venta 2: Juan (99) compra en la tienda de Brasil Rio (1006)
 INSERT INTO Factura_Ventas_Tienda (id_tienda, numeroventa, fecha_venta, id_lego_cliente, total)
-VALUES (1006, 20001, TO_DATE('20/01/2026','DD/MM/YYYY'), 99, 269.99);
+VALUES (1006, 20001, TO_DATE('20/01/2026 15:00','DD/MM/YYYY HH24:MI'), 99, 269.99);
 
 
 /* -------------------------------------------------------------------------
@@ -466,25 +484,6 @@ INSERT INTO Prod_Relaciones (id_juguete_1, id_juguete_2) VALUES (204, 203); -- D
 -- Relaciones Mario: Bowser (402) se relaciona con el Castillo de Bowser (404)
 INSERT INTO Prod_Relaciones (id_juguete_1, id_juguete_2) VALUES (402, 404);
 INSERT INTO Prod_Relaciones (id_juguete_1, id_juguete_2) VALUES (401, 404); -- Kart con Pista
-
-
-/* -------------------------------------------------------------------------
-   22. TABLA HORARIOS
-   (Asumimos numerodia: 1=Lunes ... 7=Domingo)
-   ------------------------------------------------------------------------- */
-
--- Horario Tienda Francia (1001) - Lunes a Domingo de 10am a 8pm
-INSERT INTO Horarios (id_tienda, numerodia, hora_inicio, hora_fin) VALUES (1001, 1, TO_DATE('10:00','HH24:MI'), TO_DATE('20:00','HH24:MI'));
-INSERT INTO Horarios (id_tienda, numerodia, hora_inicio, hora_fin) VALUES (1001, 2, TO_DATE('10:00','HH24:MI'), TO_DATE('20:00','HH24:MI'));
-INSERT INTO Horarios (id_tienda, numerodia, hora_inicio, hora_fin) VALUES (1001, 3, TO_DATE('10:00','HH24:MI'), TO_DATE('20:00','HH24:MI'));
-INSERT INTO Horarios (id_tienda, numerodia, hora_inicio, hora_fin) VALUES (1001, 4, TO_DATE('10:00','HH24:MI'), TO_DATE('20:00','HH24:MI'));
-INSERT INTO Horarios (id_tienda, numerodia, hora_inicio, hora_fin) VALUES (1001, 5, TO_DATE('10:00','HH24:MI'), TO_DATE('21:00','HH24:MI')); -- Viernes cierra tarde
-INSERT INTO Horarios (id_tienda, numerodia, hora_inicio, hora_fin) VALUES (1001, 6, TO_DATE('09:00','HH24:MI'), TO_DATE('21:00','HH24:MI')); -- Sabado abre temprano
-INSERT INTO Horarios (id_tienda, numerodia, hora_inicio, hora_fin) VALUES (1001, 7, TO_DATE('11:00','HH24:MI'), TO_DATE('18:00','HH24:MI')); -- Domingo reducido
-
--- Horario Tienda Brasil Rio (1006) - Lunes a Viernes
-INSERT INTO Horarios (id_tienda, numerodia, hora_inicio, hora_fin) VALUES (1006, 1, TO_DATE('09:00','HH24:MI'), TO_DATE('22:00','HH24:MI')); -- Mall hours
-INSERT INTO Horarios (id_tienda, numerodia, hora_inicio, hora_fin) VALUES (1006, 2, TO_DATE('09:00','HH24:MI'), TO_DATE('22:00','HH24:MI'));
 
 
 /* -------------------------------------------------------------------------

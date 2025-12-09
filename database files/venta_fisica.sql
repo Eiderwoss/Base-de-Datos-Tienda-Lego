@@ -18,22 +18,28 @@ CREATE OR REPLACE TYPE juguetes_obj AS OBJECT (
     cantidad NUMBER(2),
     tipo_cliente varchar2(6)
 );
+/
 
 CREATE OR REPLACE TYPE id_juguetes_obj AS OBJECT (
     id NUMBER(4),
     cantidad NUMBER(2),
     tipo_cliente varchar2(6)
 );
+/
 
 CREATE OR REPLACE TYPE lotes_juguetes_cantidades AS OBJECT (
     id NUMBER (4),
     cantidad NUMBER(2),
-    num_lote NUMBER (8),
-)
+    num_lote NUMBER (8)
+);
+/
 
 CREATE OR REPLACE TYPE lista_juguetes IS TABLE OF juguetes_obj;
+/
 CREATE OR REPLACE TYPE lista_id_juguetes IS TABLE OF id_juguetes_obj;
+/
 CREATE OR REPLACE TYPE lista_para_detalle IS TABLE OF lotes_juguetes_cantidades;
+/
 
 ---------------------------------------------
 -- PROCEDIMIENTOS/FUNCIONES VENTA FÍSICA --
@@ -63,12 +69,13 @@ BEGIN
         EXCEPTION
             WHEN NO_DATA_FOUND THEN NULL;
             WHEN TOO_MANY_ROWS THEN
-                RAISE_APPLICATION_ERROR(-20001, 'Error: Existen múltiples clientes llamados ' || p_nombre || ' ' || p_apellido || '. Se requiere documento de identidad para diferenciar.');
+                RAISE_APPLICATION_ERROR(-20001, 'Error: Existen múltiples clientes llamados ' || primer_nombre || ' ' || primer_apellido || '. Se requiere documento de identidad para diferenciar.');
         END;
     END IF;
     
     RETURN NULL;
 END fn_fisica_buscar_cliente;
+/
 
 CREATE OR REPLACE FUNCTION fn_fisica_buscar_juguete (nombre_juguete IN varchar2)
 RETURN NUMBER IS id_juguete NUMBER(4);
@@ -78,6 +85,7 @@ BEGIN
             SELECT j.id INTO id_juguete
             FROM Juguetes j
             WHERE j.nombre = nombre_juguete;
+            RETURN id_juguete;
         EXCEPTION
             WHEN NO_DATA_FOUND THEN NULL;
         END;
@@ -85,10 +93,14 @@ BEGIN
 
     RETURN NULL;
 END fn_fisica_buscar_juguete;
+/
 
 CREATE OR REPLACE FUNCTION fn_fisica_buscar_tienda (nombre_tienda IN varchar2,nombre_ciudad IN varchar2,nombre_pais IN varchar2)
 RETURN NUMBER IS
     id_tienda NUMBER(4);
+    id_pais NUMBER(3);
+    id_estado NUMBER(5);
+    id_ciudad NUMBER(5);
 BEGIN
     IF (nombre_tienda IS NOT NULL) AND (nombre_ciudad IS NULL) AND (nombre_pais IS NULL) THEN
         BEGIN
@@ -113,7 +125,7 @@ BEGIN
             p.id = c.id_pais_est AND
             c.id = t.id_ciudad AND
             c.id_estado = t.id_estado_ciu AND
-            c.id_pais_est = t.id_pais_ciu
+            c.id_pais_est = t.id_pais_ciu;
 
             SELECT p.id INTO id_pais
             FROM paises p
@@ -128,7 +140,7 @@ BEGIN
             FROM tiendas t
             WHERE t.id_ciudad = id_ciudad AND
             t.id_estado_ciu = id_estado AND
-            t.id_pais_ciu = id_pais
+            t.id_pais_ciu = id_pais;
 
             RETURN id_tienda;
 
@@ -149,7 +161,7 @@ BEGIN
             p.id = c.id_pais_est AND
             c.id = t.id_ciudad AND
             c.id_estado = t.id_estado_ciu AND
-            c.id_pais_est = t.id_pais_ciu
+            c.id_pais_est = t.id_pais_ciu;
 
             RETURN id_tienda;
         EXCEPTION
@@ -160,10 +172,11 @@ BEGIN
     RETURN NULL;
 
 END fn_fisica_buscar_tienda;
+/
 
 CREATE OR REPLACE FUNCTION fn_fisica_seleccionar_stock (juguetes IN lista_id_juguetes, id_tienda IN NUMBER)
 RETURN lista_para_detalle IS
-CURSOR fila_lote (id_juguete_buscado NUMBER(4)) IS  SELECT i.num_lote, i.cantidad
+CURSOR fila_lote (id_juguete_buscado NUMBER) IS  SELECT i.num_lote, i.cantidad
                                                     FROM inventario_lotes i 
                                                     WHERE i.id_tienda = id_tienda AND 
                                                     i.id_juguete = id_juguete_buscado AND
@@ -330,7 +343,7 @@ BEGIN
             IF lista_lotes(k).id = id_juguetes(j).id THEN
                 BEGIN
                     INSERT INTO detalle_factura_ventas_tienda VALUES (id_tienda, id_factura_actual, seq_detalle_venta_tienda.nextval, 
-                    lista_lotes(k).cantidad, id_juguete(j).tipo_cliente, id_juguetes(j).id, id_tienda, lista_lotes(k).num_lote);
+                    lista_lotes(k).cantidad, id_juguetes(j).tipo_cliente, id_juguetes(j).id, id_tienda, lista_lotes(k).num_lote);
                 END;
             END IF;
         END LOOP;
@@ -350,6 +363,7 @@ EXCEPTION
         ROLLBACK;
         RAISE_APPLICATION_ERROR(-20000, 'Fallo en Venta Física: ' || SQLERRM);
 END sp_fisica_agregar_factura;
+/
 
 ----------------------------
 -- TRIGGERS VENTA FÍSICA --
@@ -371,7 +385,7 @@ BEGIN
         SELECT hora_inicio, hora_fin
         INTO apertura, cierre
         FROM horarios
-        WHERE id_tienda = AND
+        WHERE id_tienda = tienda AND
         numerodia = dia_semana;
 
         IF fecha_venta_norm < apertura OR fecha_venta_norm > cierre THEN

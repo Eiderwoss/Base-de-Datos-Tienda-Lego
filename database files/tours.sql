@@ -23,6 +23,21 @@ BEGIN
 END;
 /
 
+--Calcular el total de la inscripcion
+-- 2. Función: ¿Cuánto debe pagar este grupo?
+CREATE OR REPLACE FUNCTION fn_calcular_costo_total (
+    p_fecha_tour DATE,
+    p_cantidad_personas NUMBER
+) RETURN NUMBER IS
+    v_costo_unitario NUMBER(5, 2);
+BEGIN
+    SELECT costo INTO v_costo_unitario FROM Tours WHERE fecha = p_fecha_tour;
+    RETURN v_costo_unitario * p_cantidad_personas;
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN RETURN 0;
+END;
+/
+
 CREATE OR REPLACE PROCEDURE sp_gestion_tour_completo (
     p_id_pagador     IN NUMBER,       
     p_fecha_tour     IN DATE,
@@ -140,23 +155,6 @@ EXCEPTION
     WHEN OTHERS THEN
         ROLLBACK;
         DBMS_OUTPUT.PUT_LINE('!!! ERROR EN EL PROCESO: ' || SQLERRM);
-END;
-/
-
---
-
---Calcular el total de la inscripcion
--- 2. Función: ¿Cuánto debe pagar este grupo?
-CREATE OR REPLACE FUNCTION fn_calcular_costo_total (
-    p_fecha_tour DATE,
-    p_cantidad_personas NUMBER
-) RETURN NUMBER IS
-    v_costo_unitario NUMBER(5, 2);
-BEGIN
-    SELECT costo INTO v_costo_unitario FROM Tours WHERE fecha = p_fecha_tour;
-    RETURN v_costo_unitario * p_cantidad_personas;
-EXCEPTION
-    WHEN NO_DATA_FOUND THEN RETURN 0;
 END;
 /
 

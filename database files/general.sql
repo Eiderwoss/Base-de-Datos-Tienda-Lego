@@ -15,17 +15,11 @@ CREATE OR REPLACE FUNCTION fn_convertir_moneda (
     p_monto_dolares NUMBER, 
     p_moneda_destino VARCHAR2
 ) RETURN NUMBER IS
-    v_resultado NUMBER;
 BEGIN
-    IF UPPER(p_moneda_destino) = 'EURO' THEN
-        v_resultado := p_monto_dolares * 0.92; -- 1 USD = 0.92 EUR
-    ELSIF UPPER(p_moneda_destino) LIKE 'CORONA%' THEN
-        v_resultado := p_monto_dolares * 6.85; -- 1 USD = 6.85 DKK
-    ELSE
-        v_resultado := p_monto_dolares;
+    IF UPPER(p_moneda_destino) = 'EURO' THEN RETURN ROUND(p_monto_dolares * 0.92, 2);
+    ELSIF UPPER(p_moneda_destino) LIKE 'CORONA%' THEN RETURN ROUND(p_monto_dolares * 6.85, 2);
+    ELSE RETURN p_monto_dolares;
     END IF;
-    
-    RETURN ROUND(v_resultado, 2);
 END;
 /
 

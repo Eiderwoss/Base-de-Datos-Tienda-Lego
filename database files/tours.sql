@@ -2,11 +2,11 @@
 -- PROCEDIMIENTOS/FUNCIONES PARA TOURS--
 -----------------------------------------
 
-CREATE OR REPLACE FUNCTION fn_verificar_cupos (
+create or replace NONEDITIONABLE FUNCTION fn_verificar_cupos (
     p_fecha_tour DATE
 ) RETURN NUMBER IS
-    v_cupos_totales  NUMBER(2);
-    v_ocupados       NUMBER(2);
+    v_cupos_totales  NUMBER;
+    v_ocupados       NUMBER;
 BEGIN
     -- Obtenemos capacidad total
     BEGIN
@@ -21,142 +21,213 @@ BEGIN
 
     RETURN v_cupos_totales - v_ocupados;
 END;
-/
+
 
 --Calcular el total de la inscripcion
 -- 2. Función: ¿Cuánto debe pagar este grupo?
-CREATE OR REPLACE FUNCTION fn_calcular_costo_total (
+create or replace NONEDITIONABLE FUNCTION fn_calcular_costo_total (
     p_fecha_tour DATE,
     p_cantidad_personas NUMBER
 ) RETURN NUMBER IS
-    v_costo_unitario NUMBER(5, 2);
+    v_costo_unitario NUMBER;
 BEGIN
     SELECT costo INTO v_costo_unitario FROM Tours WHERE fecha = p_fecha_tour;
     RETURN v_costo_unitario * p_cantidad_personas;
 EXCEPTION
     WHEN NO_DATA_FOUND THEN RETURN 0;
 END;
-/
+
 
 CREATE OR REPLACE PROCEDURE sp_gestion_tour_completo (
-    p_id_pagador     IN NUMBER,       
-    p_fecha_tour     IN DATE,
-    p_lista_personas IN VARCHAR2 -- '100:CLIENTE, 10:FAN'
+    p_fecha_tour     DATE,
+    p_id_responsable NUMBER, 
+    p_lista_personas VARCHAR2
 ) IS
-    -- Variables de Flujo
-    v_cupos_libres   NUMBER;
-    v_num_personas   NUMBER := 1; -- Empieza en 1 por el pagador
-    v_num_inscripcion NUMBER;
-    v_total_pagar    NUMBER;
+    -- Variables Financieras
+    v_cupos_disponibles NUMBER;
+    v_num_inscripcion   NUMBER;
+    v_total_usd         NUMBER; 
+    v_total_eur         NUMBER;
+    v_total_dkk         NUMBER;
     
-    -- Variables Auxiliares
-    v_eur            NUMBER;
-    v_dkk            NUMBER;
+    -- Variables de Parsing
+    v_lista             VARCHAR2(32000) := p_lista_personas;
+    v_bloque            VARCHAR2(100);
+    v_pos_coma          NUMBER;
+    v_pos_dos_puntos    NUMBER;
+    v_id_persona        NUMBER;
+    v_tipo              VARCHAR2(50); -- Aumentado por seguridad
+    v_next_id           NUMBER := 0;
+    v_count_personas    NUMBER := 0;
     
-    -- Variables para Parsing (Leer la lista)
-    v_lista          VARCHAR2(4000) := p_lista_personas;
-    v_pos_coma       NUMBER;
-    v_bloque         VARCHAR2(100);
-    v_pos_dos_puntos NUMBER;
-    v_id_persona     NUMBER;
-    v_tipo           VARCHAR2(20);
-    v_next_id        NUMBER := 1;
+    -- Variables de Seguridad y Validación
+    v_fecha_nac_check   DATE;
+    v_edad_check        NUMBER;
+    v_hay_adulto_resp   BOOLEAN := FALSE; 
+    v_hay_nino          BOOLEAN := FALSE;
+    v_check_tour        NUMBER; -- Variable para verificar si existe el tour
+
 BEGIN
-    DBMS_OUTPUT.PUT_LINE('=== INICIO DEL PROCESO DE GESTIÓN DE TOUR ===');
-
-    -- 1. VERIFICACIÓN (Usando Funciones)
-    -- Calcular cantidad de personas en la lista
-    IF p_lista_personas IS NOT NULL THEN
-        v_num_personas := v_num_personas + REGEXP_COUNT(p_lista_personas, ',') + 1;
+    -- 0. VALIDACIÓN DE FECHA (No permite hoy ni pasado)
+    IF TRUNC(p_fecha_tour) <= TRUNC(SYSDATE) THEN
+        RAISE_APPLICATION_ERROR(-20007, 'Error: Las reservaciones deben hacerse con al menos un día de antelación.');
     END IF;
 
-    -- Llamar función de cupos
-    v_cupos_libres := fn_verificar_cupos(p_fecha_tour);
+    -- =========================================================
+    -- 0.1 VALIDACIÓN DE EXISTENCIA DEL TOUR (NUEVO)
+    -- =========================================================
+    SELECT COUNT(*) INTO v_check_tour 
+    FROM Tours 
+    WHERE fecha = p_fecha_tour;
 
-    IF v_cupos_libres = -1 THEN
-        RAISE_APPLICATION_ERROR(-20000, 'El Tour para la fecha indicada no existe.');
-    ELSIF v_cupos_libres < v_num_personas THEN
-        RAISE_APPLICATION_ERROR(-20090, 'Cupos insuficientes. Solicitados: ' || v_num_personas || '. Disponibles: ' || v_cupos_libres);
+    IF v_check_tour = 0 THEN
+        RAISE_APPLICATION_ERROR(-20009, 'Error: No existe ningún tour programado para la fecha ' || TO_CHAR(p_fecha_tour, 'DD/MM/YYYY'));
+    END IF;
+    -- =========================================================
+
+    -- 1. VALIDAR CUPOS
+    v_cupos_disponibles := fn_verificar_cupos(p_fecha_tour);
+    IF v_cupos_disponibles <= 0 THEN
+        RAISE_APPLICATION_ERROR(-20003, 'No hay cupos disponibles.');
     END IF;
 
-    DBMS_OUTPUT.PUT_LINE('[OK] Disponibilidad confirmada.');
-
-    -- 2. REGISTRO (PENDIENTE)
-    SELECT NVL(MAX(numeroinscripcion), 0) + 1 INTO v_num_inscripcion 
-    FROM Inscripciones WHERE fecha_tour = p_fecha_tour;
-
-    -- Creamos Cabecera
+    -- 2. CREAR CABECERA (PENDIENTE)
+    SELECT NVL(MAX(numeroinscripcion), 0) + 1 INTO v_num_inscripcion FROM Inscripciones WHERE fecha_tour = p_fecha_tour;
     INSERT INTO Inscripciones (fecha_tour, numeroinscripcion, fecha_inscripcion, estatus, total)
     VALUES (p_fecha_tour, v_num_inscripcion, SYSDATE, 'PENDIENTE', 0);
 
-    -- Insertamos Pagador
-    INSERT INTO Detalle_Inscripciones (fecha_tour_ins, numeroinscripcion, id, id_lego_cli, id_lego_fan)
-    VALUES (p_fecha_tour, v_num_inscripcion, v_next_id, p_id_pagador, NULL);
+    -- 3. PROCESAR LISTA (Parsing y Lógica)
+    IF v_lista IS NOT NULL THEN
+        IF SUBSTR(v_lista, -1) != ',' THEN v_lista := v_lista || ','; END IF;
 
-    -- Insertamos Acompañantes (Parsing)
-    IF p_lista_personas IS NOT NULL THEN
-        v_lista := v_lista || ',';
         LOOP
+            EXIT WHEN v_lista IS NULL OR LENGTH(TRIM(v_lista)) = 0;
             v_pos_coma := INSTR(v_lista, ',');
             EXIT WHEN v_pos_coma = 0;
-            
-            v_bloque := SUBSTR(v_lista, 1, v_pos_coma - 1);
-            v_pos_dos_puntos := INSTR(v_bloque, ':');
-            
-            IF v_pos_dos_puntos > 0 THEN
-                v_id_persona := TO_NUMBER(SUBSTR(v_bloque, 1, v_pos_dos_puntos - 1));
-                v_tipo       := UPPER(TRIM(SUBSTR(v_bloque, v_pos_dos_puntos + 1)));
-                v_next_id    := v_next_id + 1;
 
-                IF v_tipo = 'CLIENTE' THEN
-                    INSERT INTO Detalle_Inscripciones VALUES (p_fecha_tour, v_num_inscripcion, v_next_id, v_id_persona, NULL);
-                ELSIF v_tipo = 'FAN' THEN
-                    INSERT INTO Detalle_Inscripciones VALUES (p_fecha_tour, v_num_inscripcion, v_next_id, NULL, v_id_persona);
+            v_bloque := TRIM(SUBSTR(v_lista, 1, v_pos_coma - 1));
+            IF LENGTH(v_bloque) > 0 THEN
+                v_pos_dos_puntos := INSTR(v_bloque, ':');
+                IF v_pos_dos_puntos > 0 THEN
+                    v_id_persona := TO_NUMBER(TRIM(SUBSTR(v_bloque, 1, v_pos_dos_puntos - 1)));
+                    v_tipo       := UPPER(TRIM(SUBSTR(v_bloque, v_pos_dos_puntos + 1)));
+                    
+                    -- Protección de sintaxis básica
+                    IF v_tipo NOT IN ('CLIENTE', 'FAN') THEN
+                         RAISE_APPLICATION_ERROR(-20008, 'Tipo inválido en la lista: ' || v_tipo || '. Verifique comas.');
+                    END IF;
+
+                    v_next_id    := v_next_id + 1;
+                    v_count_personas := v_count_personas + 1;
+                    
+                    -- A. VERIFICAR EDAD Y ROL
+                    BEGIN
+                        IF v_tipo = 'CLIENTE' THEN
+                            SELECT fecha_nacimiento INTO v_fecha_nac_check FROM Clientes WHERE id_lego = v_id_persona;
+                        ELSIF v_tipo = 'FAN' THEN
+                            SELECT fecha_nacimiento INTO v_fecha_nac_check FROM Fan_Lego_Menores WHERE id_lego = v_id_persona;
+                        END IF;
+                        
+                        -- Usamos fn_edad estándar
+                        v_edad_check := fn_calcular_edad(v_fecha_nac_check);
+                        
+                        -- REGLA DE SEGURIDAD:
+                        IF v_edad_check >= 18 THEN 
+                            v_hay_adulto_resp := TRUE;
+                        ELSE 
+                            v_hay_nino := TRUE;
+                        END IF;
+
+                    EXCEPTION
+                        WHEN NO_DATA_FOUND THEN ROLLBACK; RAISE_APPLICATION_ERROR(-20005, 'Persona ID ' || v_id_persona || ' no encontrada.');
+                    END;
+
+                    -- B. INSERTAR DETALLE
+                    IF v_tipo = 'CLIENTE' THEN
+                        INSERT INTO Detalle_Inscripciones VALUES (p_fecha_tour, v_num_inscripcion, v_next_id, v_id_persona, NULL);
+                    ELSIF v_tipo = 'FAN' THEN
+                        INSERT INTO Detalle_Inscripciones VALUES (p_fecha_tour, v_num_inscripcion, v_next_id, NULL, v_id_persona);
+                    END IF;
                 END IF;
             END IF;
             v_lista := SUBSTR(v_lista, v_pos_coma + 1);
         END LOOP;
     END IF;
 
-    -- 3. CÁLCULO DE TOTAL (Usando Función)
-    v_total_pagar := fn_calcular_costo_total(p_fecha_tour, v_num_personas);
+    -- 4. VALIDACIONES FINALES
+    IF v_count_personas > v_cupos_disponibles THEN
+        ROLLBACK; RAISE_APPLICATION_ERROR(-20004, 'Cupos insuficientes.');
+    END IF;
     
-    -- Actualizamos cabecera
-    UPDATE Inscripciones SET total = v_total_pagar 
+    -- Si hay niños (<18), DEBE haber un responsable (>=18)
+    IF v_hay_nino AND NOT v_hay_adulto_resp THEN
+        ROLLBACK; 
+        RAISE_APPLICATION_ERROR(-20006, 'Regla violada: Menores de 18 años deben ir acompañados de un representante (Mayor de 18).');
+    END IF;
+
+    -- 5. CÁLCULOS Y PAGO
+    v_total_usd := fn_calcular_costo_total(p_fecha_tour, v_count_personas);
+    v_total_eur := fn_convertir_moneda(v_total_usd, 'EURO');
+    v_total_dkk := fn_convertir_moneda(v_total_usd, 'CORONA DANESA');
+
+    -- Guardar totales
+    UPDATE Inscripciones SET total = v_total_usd 
     WHERE fecha_tour = p_fecha_tour AND numeroinscripcion = v_num_inscripcion;
-
-    DBMS_OUTPUT.PUT_LINE('[OK] Registro creado (PENDIENTE). Total calculado.');
-
-    -- 4. MOSTRAR PRESUPUESTO (Usando Funciones de Moneda)
-    v_eur := fn_convertir_moneda(v_total_pagar, 'EURO');
-    v_dkk := fn_convertir_moneda(v_total_pagar, 'CORONA DANESA');
     
-    DBMS_OUTPUT.PUT_LINE('-----------------------------------');
-    DBMS_OUTPUT.PUT_LINE(' CONFIRMACIÓN DE COSTOS (Insc #' || v_num_inscripcion || ')');
-    DBMS_OUTPUT.PUT_LINE('-----------------------------------');
-    DBMS_OUTPUT.PUT_LINE(' USD: $' || v_total_pagar);
-    DBMS_OUTPUT.PUT_LINE(' EUR: €' || v_eur);
-    DBMS_OUTPUT.PUT_LINE(' DKK: kr' || v_dkk);
-    DBMS_OUTPUT.PUT_LINE('-----------------------------------');
+    COMMIT; -- Guardamos PENDIENTE antes de mostrar factura
 
-    -- 5. PROCESAR PAGO
-    -- Al hacer esto, el Trigger 'trg_generar_entradas_automatico' se dispara y crea los tickets
-    UPDATE Inscripciones 
-    SET estatus = 'PAGADO' 
+    -- =========================================================
+    -- 6. FACTURA EN PANTALLA (SIN ID)
+    -- =========================================================
+    DBMS_OUTPUT.PUT_LINE('==================================================');
+    DBMS_OUTPUT.PUT_LINE('       FACTURA DE INSCRIPCIÓN #' || v_num_inscripcion);
+    DBMS_OUTPUT.PUT_LINE('==================================================');
+    DBMS_OUTPUT.PUT_LINE(' Fecha:      ' || p_fecha_tour);
+    DBMS_OUTPUT.PUT_LINE(' Estado:     PENDIENTE');
+    DBMS_OUTPUT.PUT_LINE('--------------------------------------------------');
+    DBMS_OUTPUT.PUT_LINE(' TOTAL A PAGAR:');
+    DBMS_OUTPUT.PUT_LINE('   USD: $  ' || v_total_usd || ' (Base)');
+    DBMS_OUTPUT.PUT_LINE('   DKK: kr ' || v_total_dkk);
+    DBMS_OUTPUT.PUT_LINE('   EUR: €  ' || v_total_eur);
+    DBMS_OUTPUT.PUT_LINE('--------------------------------------------------');
+    DBMS_OUTPUT.PUT_LINE(' VISITANTES:');
+    -- CAMBIO: Se quitó la columna ID
+    DBMS_OUTPUT.PUT_LINE(' NOMBRE               | TIPO TICKET (Tarifa)');
+    DBMS_OUTPUT.PUT_LINE('----------------------|---------------------');
+
+    FOR r IN (
+        SELECT d.id, 
+               CASE WHEN d.id_lego_cli IS NOT NULL THEN c.primer_nombre || ' ' || c.primer_apellido
+                    WHEN d.id_lego_fan IS NOT NULL THEN f.primer_nombre || ' ' || f.primer_apellido
+               END as nombre_completo,
+               CASE 
+                   WHEN fn_calcular_edad(NVL(c.fecha_nacimiento, f.fecha_nacimiento)) >= 21 THEN 'ADULTO'
+                   ELSE 'JOVEN'
+               END as tipo_tarifa
+        FROM Detalle_Inscripciones d
+        LEFT JOIN Clientes c ON d.id_lego_cli = c.id_lego
+        LEFT JOIN Fan_Lego_Menores f ON d.id_lego_fan = f.id_lego
+        WHERE d.fecha_tour_ins = p_fecha_tour AND d.numeroinscripcion = v_num_inscripcion
+        ORDER BY d.id
+    ) LOOP
+        -- CAMBIO: Se quitó la impresión del ID
+        DBMS_OUTPUT.PUT_LINE(RPAD(SUBSTR(r.nombre_completo,1,20), 21) || '| ' || r.tipo_tarifa);
+    END LOOP;
+    DBMS_OUTPUT.PUT_LINE('==================================================');
+
+    -- 7. EJECUTAR PAGO
+    UPDATE Inscripciones SET estatus = 'PAGADO' 
     WHERE fecha_tour = p_fecha_tour AND numeroinscripcion = v_num_inscripcion;
-
     COMMIT;
     
-    DBMS_OUTPUT.PUT_LINE('[EXITO] Pago procesado. Estatus: PAGADO.');
-    DBMS_OUTPUT.PUT_LINE('[EXITO] Tickets generados automáticamente en tabla ENTRADAS.');
-    DBMS_OUTPUT.PUT_LINE('=== FIN DEL PROCESO ===');
+    DBMS_OUTPUT.PUT_LINE('[EXITO] Pago procesado y Entradas generadas.');
 
 EXCEPTION
     WHEN OTHERS THEN
         ROLLBACK;
-        DBMS_OUTPUT.PUT_LINE('!!! ERROR EN EL PROCESO: ' || SQLERRM);
+        DBMS_OUTPUT.PUT_LINE('>>> ERROR: ' || SQLERRM);
+        RAISE;
 END;
-/
 
 -------------------------------
 -- TRIGGERS PARA LOS TOURS --
@@ -260,10 +331,9 @@ END;
 CREATE OR REPLACE TRIGGER trg_generar_entradas_automatico
 AFTER UPDATE OF estatus ON Inscripciones
 FOR EACH ROW
-WHEN (NEW.estatus = 'PAGADO') -- Solo se dispara al pagar
+WHEN (NEW.estatus = 'PAGADO')
 DECLARE
-    -- Cursor para recorrer a los participantes de ESA inscripción
-    CURSOR c_gente IS
+    CURSOR c_detalle IS
         SELECT id, id_lego_cli, id_lego_fan
         FROM Detalle_Inscripciones
         WHERE fecha_tour_ins = :NEW.fecha_tour 
@@ -271,26 +341,31 @@ DECLARE
           
     v_fecha_nac DATE;
     v_edad      NUMBER;
-    v_tipo      VARCHAR2(10);
+    v_tipo      VARCHAR2(20);
+    v_num_entrada NUMBER;
 BEGIN
-    FOR r IN c_gente LOOP
-        -- 1. Calcular Edad para definir tipo de entrada
+    FOR r IN c_detalle LOOP
         IF r.id_lego_cli IS NOT NULL THEN
             SELECT fecha_nacimiento INTO v_fecha_nac FROM Clientes WHERE id_lego = r.id_lego_cli;
-        ELSE
+        ELSIF r.id_lego_fan IS NOT NULL THEN
             SELECT fecha_nacimiento INTO v_fecha_nac FROM Fan_Lego_Menores WHERE id_lego = r.id_lego_fan;
         END IF;
-        
-        v_edad := TRUNC(MONTHS_BETWEEN(SYSDATE, v_fecha_nac)/12);
-        
-        IF v_edad >= 18 THEN v_tipo := 'ADULTO';
-        ELSIF v_edad >= 12 THEN v_tipo := 'JOVEN';
-        ELSE v_tipo := 'MENOR';
+
+        v_edad := fn_calcular_edad(v_fecha_nac);
+
+        -- CAMBIO AQUI: Umbral de Adulto sube a 21
+        -- Así el de 19 años tendrá ticket JOVEN
+        IF v_edad >= 21 THEN 
+            v_tipo := 'ADULTO';
+        ELSE 
+            v_tipo := 'JOVEN'; 
         END IF;
-        
-        -- 2. Crear la Entrada (Ticket)
+
+        SELECT NVL(MAX(numeroentrada), 0) + 1 INTO v_num_entrada 
+        FROM Entradas 
+        WHERE fecha_tour_ins = :NEW.fecha_tour AND numeroinscripcion = :NEW.numeroinscripcion;
+
         INSERT INTO Entradas (fecha_tour_ins, numeroinscripcion, numeroentrada, tipo)
-        VALUES (:NEW.fecha_tour, :NEW.numeroinscripcion, r.id, v_tipo);
+        VALUES (:NEW.fecha_tour, :NEW.numeroinscripcion, v_num_entrada, v_tipo);
     END LOOP;
 END;
-/

@@ -39,8 +39,8 @@ CREATE OR REPLACE TYPE lista_para_detalle IS TABLE OF lotes_juguetes_cantidades;
 -- PROCEDIMIENTOS/FUNCIONES VENTA FÍSICA --
 ---------------------------------------------
 
-CREATE OR REPLACE FUNCTION fn_fisica_buscar_cliente (primer_nombre IN varchar2(10), primer_apellido IN varchar2(10), documento_identidad IN NUMBER(9))
-RETURN NUMBER(6) IS id_encontrado NUMBER(6);
+CREATE OR REPLACE FUNCTION fn_fisica_buscar_cliente (primer_nombre IN varchar2, primer_apellido IN varchar2, documento_identidad IN NUMBER)
+RETURN NUMBER IS id_encontrado NUMBER(6);
 BEGIN
     IF documento_identidad IS NOT NULL THEN
         BEGIN
@@ -70,8 +70,8 @@ BEGIN
     RETURN NULL;
 END fn_fisica_buscar_cliente;
 
-CREATE OR REPLACE FUNCTION fn_fisica_buscar_juguete (nombre_juguete IN varchar2(60))
-RETURN NUMBER(4) IS id_juguete NUMBER(4);
+CREATE OR REPLACE FUNCTION fn_fisica_buscar_juguete (nombre_juguete IN varchar2)
+RETURN NUMBER IS id_juguete NUMBER(4);
 BEGIN
     IF nombre_juguete IS NOT NULL THEN
         BEGIN
@@ -86,8 +86,8 @@ BEGIN
     RETURN NULL;
 END fn_fisica_buscar_juguete;
 
-CREATE OR REPLACE FUNCTION fn_fisica_buscar_tienda (nombre_tienda IN varchar2(50),nombre_ciudad IN varchar2(30),nombre_pais IN varchar2(30))
-RETURN NUMBER(4) IS
+CREATE OR REPLACE FUNCTION fn_fisica_buscar_tienda (nombre_tienda IN varchar2,nombre_ciudad IN varchar2,nombre_pais IN varchar2)
+RETURN NUMBER IS
     id_tienda NUMBER(4);
 BEGIN
     IF (nombre_tienda IS NOT NULL) AND (nombre_ciudad IS NULL) AND (nombre_pais IS NULL) THEN
@@ -161,7 +161,7 @@ BEGIN
 
 END fn_fisica_buscar_tienda;
 
-CREATE OR REPLACE FUNCTION fn_fisica_seleccionar_stock (juguetes IN lista_id_juguetes, id_tienda IN NUMBER(4))
+CREATE OR REPLACE FUNCTION fn_fisica_seleccionar_stock (juguetes IN lista_id_juguetes, id_tienda IN NUMBER)
 RETURN lista_para_detalle IS
 CURSOR fila_lote (id_juguete_buscado NUMBER(4)) IS  SELECT i.num_lote, i.cantidad
                                                     FROM inventario_lotes i 
@@ -283,8 +283,8 @@ BEGIN
 END;
 */
 
-CREATE OR REPLACE PROCEDURE sp_fisica_agregar_factura (juguetes IN lista_juguetes, nombre_tienda IN varchar2(50), nombre_ciudad IN varchar2(30), 
-nombre_pais varchar2(30), primer_nombre_cliente IN varchar2(10), primer_apellido_cliente IN varchar2(10), documento_identidad IN NUMBER (9)) IS
+CREATE OR REPLACE PROCEDURE sp_fisica_agregar_factura (juguetes IN lista_juguetes, nombre_tienda IN varchar2, nombre_ciudad IN varchar2, 
+nombre_pais varchar2, primer_nombre_cliente IN varchar2, primer_apellido_cliente IN varchar2, documento_identidad IN NUMBER) IS
     id_juguetes lista_id_juguetes := lista_id_juguetes();
     id_temporal_juguete NUMBER(4);
     id_tienda NUMBER(4);

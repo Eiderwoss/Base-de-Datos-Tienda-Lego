@@ -41,9 +41,9 @@ END;
 
 
 CREATE OR REPLACE PROCEDURE sp_realizar_inscripcion (
-    p_id_cliente_pagador IN NUMBER(6),       
+    p_id_cliente_pagador IN NUMBER,       
     p_fecha_tour         IN DATE,
-    p_lista_acompanantes IN VARCHAR2(4000) -- Puede ser NULL si va solo
+    p_lista_acompanantes IN VARCHAR2 -- Puede ser NULL si va solo
 ) IS
     -- Variables de control
     v_num_inscripcion   NUMBER(4);
@@ -183,7 +183,7 @@ END;
 --Calcular el total de la inscripcion
 CREATE OR REPLACE FUNCTION fn_calcular_total_inscripcion (
     p_fecha_tour DATE,
-    p_num_insc   NUMBER(4)
+    p_num_insc   NUMBER
 ) RETURN NUMBER IS
     v_costo_tour NUMBER(5, 2);
     v_cantidad   NUMBER(2);

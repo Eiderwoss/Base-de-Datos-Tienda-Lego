@@ -29,7 +29,7 @@ FROM
 
 -- Calcular saldo total dinamicamente (Suma desde la ultima factura GRATIS = 'SI')
 CREATE OR REPLACE FUNCTION fn_obtener_saldo_puntos (
-    p_id_cliente IN NUMBER(6)
+    p_id_cliente IN NUMBER
 )
 RETURN NUMBER IS
     v_saldo_acumulado NUMBER(3) := 0;
@@ -68,8 +68,8 @@ END;
 
 -- Validar canjeo de puntos
 CREATE OR REPLACE PROCEDURE sp_validar_canje_puntos (
-    p_id_cliente IN NUMBER(6),
-    p_puntos_usar IN NUMBER(3)
+    p_id_cliente IN NUMBER,
+    p_puntos_usar IN NUMBER
 ) IS
     v_saldo_actual NUMBER(3);
 BEGIN
@@ -91,14 +91,14 @@ END;
 
 -- Canjeo de puntos
 CREATE OR REPLACE PROCEDURE sp_canjear_puntos (
-    p_id_cliente IN NUMBER(6),
-    p_id_juguete_canje IN NUMBER(4),
-    p_puntos_requeridos IN NUMBER(3)
+    p_id_cliente IN NUMBER,
+    p_id_juguete_canje IN NUMBER
 )
 IS
     v_num_venta NUMBER(7);
     v_pais_res NUMBER(3);
     v_es_ue CHAR(2);
+    v_puntos_requeridos CONSTANT NUMBER := 500;
     
     e_saldo_insuficiente EXCEPTION;
     PRAGMA EXCEPTION_INIT(e_saldo_insuficiente, -20040);
@@ -106,7 +106,7 @@ BEGIN
     -- Validacion del saldo
     sp_validar_canje_puntos(
         p_id_cliente => p_id_cliente,
-        p_puntos_usar => p_puntos_requeridos
+        p_puntos_usar => v_puntos_requeridos
     );
     
     -- Obtener datos del cliente (ncesario para la validacion de catalogo en el detalle factura)
@@ -152,7 +152,7 @@ BEGIN
     );
     
     DBMS_OUTPUT.PUT_LINE('CANJE EXITOSO. Factura gratuita #' || v_num_venta || 
-                         ' creada. Se consumieron ' || p_puntos_requeridos || ' puntos.');
+                         ' creada. Se consumieron ' || v_puntos_requeridos || ' puntos.');
     
 EXCEPTION
     WHEN NO_DATA_FOUND THEN
@@ -168,7 +168,7 @@ END;
 /
 
 -- Funcion de otorgar puntos
-CREATE OR REPLACE FUNCTION fn_calcular_puntos (p_monto_total NUMBER(6, 2)) 
+CREATE OR REPLACE FUNCTION fn_calcular_puntos (p_monto_total NUMBER) 
 RETURN NUMBER IS
     v_puntos NUMBER(3) := 0;
 BEGIN
@@ -194,8 +194,8 @@ END;
 /
 
 CREATE OR REPLACE PROCEDURE sp_venta_online_txt (
-    p_id_cliente      IN NUMBER(6),
-    p_lista_productos IN VARCHAR2(4000) -- Ejemplo: '201:1, 101:2'
+    p_id_cliente      IN NUMBER,
+    p_lista_productos IN VARCHAR2 -- Ejemplo: '201:1, 101:2'
 ) IS
     -- Variables de Cabecera
     v_num_venta      NUMBER(7);
@@ -215,6 +215,9 @@ CREATE OR REPLACE PROCEDURE sp_venta_online_txt (
     v_prod_cant      NUMBER(4);
     v_precio_unit    NUMBER(5,2);
     v_next_id_det    NUMBER(2) := 1; -- ID autoincremental para el detalle
+    
+    v_puntos_requeridos CONSTANT NUMBER := 500;
+    v_saldo_post_venta NUMBER(3);
 
 BEGIN
     -- 1. Obtener Datos del Cliente (País y si pertenece a la UE para el impuesto)
@@ -297,6 +300,18 @@ BEGIN
     DBMS_OUTPUT.PUT_LINE('Venta Online #' || v_num_venta || ' generada.');
     DBMS_OUTPUT.PUT_LINE('Total pagado: ' || v_total_neto || ' (Envío: ' || v_recargo || ')');
     DBMS_OUTPUT.PUT_LINE('Puntos ganados: ' || v_puntos);
+    
+    v_saldo_post_venta := fn_obtener_saldo_puntos(p_id_cliente);
+    
+    IF v_saldo_post_venta >= v_puntos_requeridos THEN
+        DBMS_OUTPUT.PUT_LINE(' ');
+        DBMS_OUTPUT.PUT_LINE('*****************************************************************************');
+        DBMS_OUTPUT.PUT_LINE('¡NOTIFICACION DE RECOMPENSA!');
+        DBMS_OUTPUT.PUT_LINE('El Cliente ID ' || p_id_cliente || ' ha alcanzado ' || v_saldo_post_venta || ' puntos.');
+        DBMS_OUTPUT.PUT_LINE('¡Tiene derecho a una COMPRA GRATUITA (solo paga el envio)!');
+        DBMS_OUTPUT.PUT_LINE('*****************************************************************************');
+        DBMS_OUTPUT.PUT_LINE(' ');
+    END IF;
 
 EXCEPTION
     WHEN OTHERS THEN

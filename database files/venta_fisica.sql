@@ -52,10 +52,12 @@ BEGIN
         BEGIN
             SELECT c.id_lego INTO id_encontrado
             FROM Clientes c
-            WHERE c.documento_identidad = documento_identidad;
+            WHERE c.documento_identidad = documento_identidad
+            FETCH FIRST 1 ROWS ONLY;
             RETURN id_encontrado;
         EXCEPTION
             WHEN NO_DATA_FOUND THEN NULL;
+            WHEN TOO_MANY_ROWS THEN NULL;
         END;
     END IF;
 
@@ -84,7 +86,8 @@ BEGIN
         BEGIN
             SELECT j.id INTO id_juguete
             FROM Juguetes j
-            WHERE j.nombre = nombre_juguete;
+            WHERE j.nombre = nombre_juguete
+            FETCH FIRST 1 ROWS ONLY;
             RETURN id_juguete;
         EXCEPTION
             WHEN NO_DATA_FOUND THEN NULL;
@@ -106,7 +109,8 @@ BEGIN
         BEGIN
             SELECT t.id INTO id_tienda
             FROM tiendas t
-            WHERE t.nombre = nombre_tienda;
+            WHERE t.nombre = nombre_tienda
+            FETCH FIRST 1 ROWS ONLY;
 
             RETURN id_tienda;
         EXCEPTION
@@ -125,22 +129,8 @@ BEGIN
             p.id = c.id_pais_est AND
             c.id = t.id_ciudad AND
             c.id_estado = t.id_estado_ciu AND
-            c.id_pais_est = t.id_pais_ciu;
-
-            SELECT p.id INTO id_pais
-            FROM paises p
-            WHERE p.nombre = nombre_pais;
-
-            SELECT c.id_estado, c.id INTO id_estado, id_ciudad
-            FROM ciudades c
-            WHERE c.nombre = nombre_ciudad AND
-            c.id_pais_est = id_pais;
-
-            SELECT t.id INTO id_tienda
-            FROM tiendas t
-            WHERE t.id_ciudad = id_ciudad AND
-            t.id_estado_ciu = id_estado AND
-            t.id_pais_ciu = id_pais;
+            c.id_pais_est = t.id_pais_ciu
+            FETCH FIRST 1 ROWS ONLY;
 
             RETURN id_tienda;
 
@@ -161,7 +151,8 @@ BEGIN
             p.id = c.id_pais_est AND
             c.id = t.id_ciudad AND
             c.id_estado = t.id_estado_ciu AND
-            c.id_pais_est = t.id_pais_ciu;
+            c.id_pais_est = t.id_pais_ciu
+            FETCH FIRST 1 ROWS ONLY;
 
             RETURN id_tienda;
         EXCEPTION
@@ -378,15 +369,19 @@ DECLARE
     apertura        DATE;
     cierre          DATE;
     tienda          NUMBER(4) := :NEW.id_tienda;
+    C_FECHA_BASE CONSTANT DATE := TO_DATE('01/01/2000', 'DD/MM/YYYY');
 BEGIN
     dia_semana := TO_NUMBER(TO_CHAR(:NEW.fecha_venta, 'D'));
     fecha_venta_norm := TO_DATE('01/01/2000', 'DD/MM/YYYY') + (:NEW.fecha_venta - TRUNC(:NEW.fecha_venta));
     BEGIN
-        SELECT hora_inicio, hora_fin
+        SELECT 
+            C_FECHA_BASE + (h.hora_inicio - TRUNC(h.hora_inicio)),
+            C_FECHA_BASE + (h.hora_fin - TRUNC(h.hora_fin))
         INTO apertura, cierre
-        FROM horarios
+        FROM horarios h
         WHERE id_tienda = tienda AND
-        numerodia = dia_semana;
+        numerodia = dia_semana
+        FETCH FIRST 1 ROWS ONLY;
 
         IF fecha_venta_norm < apertura OR fecha_venta_norm > cierre THEN
             RAISE_APPLICATION_ERROR(-20050, 'La tienda está cerrada. Intente dentro del horario establecido.');

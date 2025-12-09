@@ -3,25 +3,30 @@
 ------------------------------------------
 
 -- 3. Funcion para validar edad
-CREATE OR REPLACE FUNCTION fn_calcular_edad (p_fecha_nac DATE) 
+create or replace NONEDITIONABLE FUNCTION fn_calcular_edad (p_fecha_nac DATE) 
 RETURN NUMBER IS
 BEGIN
     RETURN TRUNC(MONTHS_BETWEEN(SYSDATE, p_fecha_nac) / 12);
 END;
-/
+
 
 -- 4.    Funcion para conversion de las moendas
 CREATE OR REPLACE FUNCTION fn_convertir_moneda (
-    p_monto_dolares NUMBER, 
+    p_monto_base_usd NUMBER, 
     p_moneda_destino VARCHAR2
 ) RETURN NUMBER IS
+    -- Tasas de cambio aproximadas (Base 1 USD)
+    v_tasa_dkk NUMBER := 6.85; -- 1 USD = 6.85 Coronas
+    v_tasa_eur NUMBER := 0.95; -- 1 USD = 0.95 Euros
 BEGIN
-    IF UPPER(p_moneda_destino) = 'EURO' THEN RETURN ROUND(p_monto_dolares * 0.92, 2);
-    ELSIF UPPER(p_moneda_destino) LIKE 'CORONA%' THEN RETURN ROUND(p_monto_dolares * 6.85, 2);
-    ELSE RETURN p_monto_dolares;
+    IF UPPER(p_moneda_destino) IN ('CORONA DANESA', 'DKK', 'CORONAS') THEN
+        RETURN ROUND(p_monto_base_usd * v_tasa_dkk, 2);
+    ELSIF UPPER(p_moneda_destino) IN ('EURO', 'EUR', 'EUROS') THEN
+        RETURN ROUND(p_monto_base_usd * v_tasa_eur, 2);
+    ELSE
+        RETURN p_monto_base_usd; -- Si es USD, devuelve el mismo
     END IF;
 END;
-/
 
 --------------------------
 -- TRIGGERS GENERALES --

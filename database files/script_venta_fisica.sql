@@ -10,8 +10,8 @@ WHERE p.id = c.id_pais_est AND c.id = t.id_ciudad AND c.id_estado = t.id_estado_
 ORDER BY t.id;
 
 ACCEPT v_tienda_input DEFAULT 'LEGO Store Toulon' PROMPT '1. Nombre Tienda: ';
-ACCEPT v_ciudad_input DEFAULT 'LA VALETTE-DU-VAR' PROMPT '2. Ciudad: ';
-ACCEPT v_pais_input   DEFAULT 'FRANCIA'           PROMPT '3. Pais: ';
+ACCEPT v_ciudad_input PROMPT '2. Ciudad: ';
+ACCEPT v_pais_input   PROMPT '3. Pais: ';
 ACCEPT v_doc_cliente  PROMPT '4. Doc Identidad Cliente: ';
 ACCEPT v_nombre_cli   PROMPT '5. Nombre Cliente (Opcional): ';
 ACCEPT v_apellido_cli PROMPT '6. Apellido Cliente (Opcional): ';

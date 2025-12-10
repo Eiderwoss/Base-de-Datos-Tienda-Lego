@@ -50,23 +50,23 @@ COLUMN LIMITE_POR_PAIS FORMAT 99
 
 -- Muestra solo los juguetes con precio activo
 SELECT
-    j.id ID_JUGUETE,
-    j.nombre NOMBRE_JUGUETE,
-    hp.precio PRECIO_ACTUAL,
-    p.id ID_PAIS,
-    p.nombre PAIS_DISPONIBLE,
-    cp.limite LIMITE_POR_PAIS
+    j.id AS ID_JUGUETE,
+    j.nombre AS NOMBRE_JUGUETE,
+    hp.precio AS PRECIO_ACTUAL,
+    p.id AS ID_PAIS,
+    p.nombre AS PAIS_DISPONIBLE,
+    cp.limite AS LIMITE_POR_PAIS
 FROM
-    Juguetes j
-JOIN
-    Historico_Precios hp ON j.id = hp.id_juguete
-JOIN
-    Catalogo_Paises cp ON j.id = cp.id_juguete
-JOIN
-    Paises p ON cp.id_pais = p.id
+    Juguetes j,
+    Historico_Precios hp,
+    Catalogo_Paises cp,
+    Paises p
 WHERE
-    hp.fecha_fin IS NULL
-    AND cp.id_pais = &v_id_pais_residencia -- <<< FILTRO APLICADO
+    j.id = hp.id_juguete          -- Unión Juguetes con Precios
+    AND j.id = cp.id_juguete      -- Unión Juguetes con Catálogo
+    AND cp.id_pais = p.id         -- Unión Catálogo con Países
+    AND hp.fecha_fin IS NULL      -- Filtro de vigencia de precio
+    AND cp.id_pais = &v_id_pais_residencia -- <<< FILTRO DE USUARIO
 ORDER BY
     j.id, p.id;
 

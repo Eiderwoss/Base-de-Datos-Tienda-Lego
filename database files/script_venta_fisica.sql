@@ -19,7 +19,14 @@ ACCEPT v_apellido_cli PROMPT '6. Apellido Cliente (Opcional): ';
 PROMPT ==============================================================;
 PROMPT               CATALOGO RAPIDO;
 PROMPT ==============================================================;
-SELECT nombre, rango_precio FROM Juguetes;
+SELECT DISTINCT j.nombre, j.rango_precio
+FROM Paises p, Ciudades c, Tiendas t, Inventario_lotes i, Juguetes j
+WHERE p.id = c.id_pais_est AND c.id = t.id_ciudad AND c.id_estado = t.id_estado_ciu AND c.id_pais_est = t.id_pais_ciu AND 
+t.id = i.id_tienda AND i.id_juguete = j.id AND p.nombre = '&v_pais_input' AND c.nombre = '&v_ciudad_input' AND 
+t.nombre = '&v_tienda_input'AND i.cantidad > 0
+ORDER BY j.nombre;
+
+
 PROMPT ;
 PROMPT INSTRUCCIONES DE FORMATO:
 PROMPT Ingrese los juguetes separados por PUNTO Y COMA (;).

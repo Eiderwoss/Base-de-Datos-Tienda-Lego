@@ -17,14 +17,16 @@ COLUMN APELLIDO FORMAT A15
 COLUMN PUNTOS_DISPONIBLES FORMAT 999
 COLUMN PAIS FORMAT A15
 
-SELECT c.id_lego ID,
-       c.primer_nombre NOMBRE,
-       c.primer_apellido APELLIDO,
-       p.nombre PAIS,
-       vsc.puntos_disponibles PUNTOS_DISPONIBLES
-FROM Clientes c
-JOIN Paises p ON c.id_pais_res = p.id
-JOIN v_saldo_puntos_cliente vsc ON c.id_lego = vsc.id_cliente
+SELECT c.id_lego AS ID,
+       c.primer_nombre AS NOMBRE,
+       c.primer_apellido AS APELLIDO,
+       p.nombre AS PAIS,
+       vsc.puntos_disponibles AS PUNTOS_DISPONIBLES
+FROM Clientes c, 
+     Paises p, 
+     v_saldo_puntos_cliente vsc
+WHERE c.id_pais_res = p.id            
+  AND c.id_lego = vsc.id_cliente      
 ORDER BY c.id_lego;
 
 PROMPT
